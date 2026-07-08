@@ -1,0 +1,879 @@
+<!DOCTYPE html>
+<html lang="zh-TW">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Kebbi Care+ AI 家庭數位分身</title>
+  <!-- Tailwind CSS -->
+  <script src="https://cdn.tailwindcss.com"></script>
+  <!-- Chart.js -->
+  <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+  <!-- Google Material Icons & Font Awesome -->
+  <link href="https://fonts.googleapis.com/icon?family=Material+Icons" rel="stylesheet">
+  <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
+  <script>
+    tailwind.config = {
+      theme: {
+        extend: {
+          colors: {
+            brand: {
+              50: '#f0f9ff',
+              100: '#e0f2fe',
+              200: '#bae6fd',
+              500: '#0ea5e9',
+              600: '#0284c7',
+            },
+            sage: {
+              50: '#f4fbf7',
+              100: '#e6f7ee',
+              500: '#10b981',
+            }
+          }
+        }
+      }
+    }
+  </script>
+  <style>
+    @import url('https://fonts.googleapis.com/css2?family=Noto+Sans+TC:wght@300;400;500;700;900&display=swap');
+    body {
+      font-family: 'Noto Sans TC', sans-serif;
+      background-color: #f8fafc;
+    }
+    .custom-scrollbar::-webkit-scrollbar {
+      width: 6px;
+    }
+    .custom-scrollbar::-webkit-scrollbar-track {
+      background: #f1f5f9;
+    }
+    .custom-scrollbar::-webkit-scrollbar-thumb {
+      background: #cbd5e1;
+      border-radius: 3px;
+    }
+    .pulse-green {
+      animation: pulse 2s cubic-bezier(0.4, 0, 0.6, 1) infinite;
+    }
+    @keyframes pulse {
+      0%, 100% { opacity: 1; transform: scale(1); }
+      50% { opacity: .7; transform: scale(0.95); }
+    }
+  </style>
+</head>
+<body class="min-h-screen text-slate-800 flex flex-col justify-between">
+
+  <!-- 頂部導航列 -->
+  <header class="bg-white border-b border-slate-100 sticky top-0 z-40 shadow-sm backdrop-blur-md bg-white/90">
+    <div class="max-w-7xl mx-auto px-4 py-3.5 flex justify-between items-center">
+      <div class="flex items-center space-x-3">
+        <div class="bg-red-50 text-red-500 p-2.5 rounded-2xl flex items-center justify-center shadow-inner">
+          <span class="material-icons text-2xl animate-bounce">favorite</span>
+        </div>
+        <div>
+          <h1 class="text-xl font-bold tracking-tight text-slate-800 flex items-center">
+            Kebbi Care<span class="text-red-500 font-black ml-0.5">+</span>
+          </h1>
+          <p class="text-[11px] text-slate-400 font-medium tracking-wider uppercase">AI 家庭數位分身系統</p>
+        </div>
+      </div>
+      
+      <!-- 連線狀態指示燈 -->
+      <div class="flex items-center space-x-2 bg-slate-50 px-3 py-1.5 rounded-full border border-slate-100">
+        <span class="relative flex h-2.5 w-2.5">
+          <span class="animate-ping absolute inline-flex h-full w-full rounded-full bg-emerald-400 opacity-75"></span>
+          <span id="connection-dot" class="relative inline-flex rounded-full h-2.5 w-2.5 bg-emerald-500"></span>
+        </span>
+        <span id="connection-status" class="text-xs font-semibold text-slate-600">Event Hub 運作中</span>
+      </div>
+    </div>
+  </header>
+
+  <!-- 主要內容區 -->
+  <main class="max-w-7xl mx-auto px-4 py-6 w-full flex-grow grid grid-cols-1 lg:grid-cols-12 gap-6">
+    
+    <!-- 左側與中央：主要儀表板 (8行寬) -->
+    <section class="lg:col-span-8 flex flex-col space-y-6">
+      
+      <!-- 溫暖引言與AI即時摘要 -->
+      <div class="bg-gradient-to-r from-brand-100 via-brand-50 to-sage-50 rounded-3xl p-6 border border-brand-200/50 shadow-sm relative overflow-hidden">
+        <div class="absolute -right-10 -bottom-10 w-40 h-40 bg-white/20 rounded-full blur-2xl"></div>
+        <div class="relative z-10">
+          <span class="inline-block bg-brand-500 text-white text-[10px] font-bold px-2.5 py-1 rounded-full uppercase tracking-wider mb-3">AI Daily Insights</span>
+          <h2 class="text-2xl font-bold text-slate-800 mb-1">今日照護總覽</h2>
+          <p class="text-slate-500 text-sm mb-4">讓 AI 陪伴家人，把最溫暖、即時的關心帶回家</p>
+          
+          <div class="bg-white/80 backdrop-blur-sm p-4.5 rounded-2xl border border-white/60 shadow-inner flex items-start space-x-3">
+            <div class="bg-amber-100 text-amber-600 p-2 rounded-xl mt-0.5">
+              <span class="material-icons text-lg">auto_awesome</span>
+            </div>
+            <div>
+              <p class="text-xs text-slate-400 font-semibold mb-1">AI 照護數位分身今日回報：</p>
+              <p id="ai-today-summary" class="text-slate-700 font-medium leading-relaxed text-sm">
+                載入中...請嘗試觸發下方事件按鈕以更新數據。
+              </p>
+            </div>
+          </div>
+        </div>
+      </div>
+
+      <!-- 四張核心照護資訊卡 -->
+      <div class="grid grid-cols-2 md:grid-cols-4 gap-4">
+        
+        <!-- 睡眠卡 -->
+        <div class="bg-white rounded-2xl p-4 border border-slate-100 shadow-sm transition-all duration-300 hover:shadow-md hover:-translate-y-0.5 flex flex-col justify-between h-[165px] relative overflow-hidden group">
+          <div class="absolute top-0 right-0 w-16 h-16 bg-blue-50 rounded-full -mr-4 -mt-4 transition-transform group-hover:scale-110"></div>
+          <div class="flex justify-between items-start relative z-10">
+            <div class="p-2 bg-blue-500/10 text-blue-600 rounded-xl">
+              <span class="material-icons text-xl">nights_stay</span>
+            </div>
+            <span id="sleep-badge" class="text-[10px] px-2 py-0.5 font-bold rounded-full bg-slate-100 text-slate-500">--</span>
+          </div>
+          <div class="mt-4">
+            <p class="text-xs text-slate-400 font-medium">😴 昨晚睡眠</p>
+            <h3 id="sleep-value" class="text-2xl font-black text-slate-800 mt-1">--</h3>
+          </div>
+          <p class="text-[10px] text-slate-400 mt-2 flex items-center justify-between border-t border-slate-50 pt-2">
+            <span>更新：<span id="sleep-time">無</span></span>
+          </p>
+        </div>
+
+        <!-- 早餐卡 -->
+        <div class="bg-white rounded-2xl p-4 border border-slate-100 shadow-sm transition-all duration-300 hover:shadow-md hover:-translate-y-0.5 flex flex-col justify-between h-[165px] relative overflow-hidden group">
+          <div class="absolute top-0 right-0 w-16 h-16 bg-amber-50 rounded-full -mr-4 -mt-4 transition-transform group-hover:scale-110"></div>
+          <div class="flex justify-between items-start relative z-10">
+            <div class="p-2 bg-amber-500/10 text-amber-600 rounded-xl">
+              <span class="material-icons text-xl">restaurant</span>
+            </div>
+            <span id="breakfast-badge" class="text-[10px] px-2 py-0.5 font-bold rounded-full bg-slate-100 text-slate-500">--</span>
+          </div>
+          <div class="mt-4">
+            <p class="text-xs text-slate-400 font-medium">🍚 早餐攝取</p>
+            <h3 id="breakfast-value" class="text-2xl font-black text-slate-800 mt-1">--</h3>
+          </div>
+          <p class="text-[10px] text-slate-400 mt-2 flex items-center justify-between border-t border-slate-50 pt-2">
+            <span>更新：<span id="breakfast-time">無</span></span>
+          </p>
+        </div>
+
+        <!-- 心情卡 -->
+        <div class="bg-white rounded-2xl p-4 border border-slate-100 shadow-sm transition-all duration-300 hover:shadow-md hover:-translate-y-0.5 flex flex-col justify-between h-[165px] relative overflow-hidden group">
+          <div class="absolute top-0 right-0 w-16 h-16 bg-pink-50 rounded-full -mr-4 -mt-4 transition-transform group-hover:scale-110"></div>
+          <div class="flex justify-between items-start relative z-10">
+            <div class="p-2 bg-pink-500/10 text-pink-600 rounded-xl">
+              <span class="material-icons text-xl">sentiment_satisfied_alt</span>
+            </div>
+            <span id="mood-badge" class="text-[10px] px-2 py-0.5 font-bold rounded-full bg-slate-100 text-slate-500">--</span>
+          </div>
+          <div class="mt-4">
+            <p class="text-xs text-slate-400 font-medium">😊 今日心情</p>
+            <h3 id="mood-value" class="text-2xl font-black text-slate-800 mt-1">--</h3>
+          </div>
+          <p class="text-[10px] text-slate-400 mt-2 flex items-center justify-between border-t border-slate-50 pt-2">
+            <span>更新：<span id="mood-time">無</span></span>
+          </p>
+        </div>
+
+        <!-- 吃藥卡 -->
+        <div class="bg-white rounded-2xl p-4 border border-slate-100 shadow-sm transition-all duration-300 hover:shadow-md hover:-translate-y-0.5 flex flex-col justify-between h-[165px] relative overflow-hidden group">
+          <div class="absolute top-0 right-0 w-16 h-16 bg-emerald-50 rounded-full -mr-4 -mt-4 transition-transform group-hover:scale-110"></div>
+          <div class="flex justify-between items-start relative z-10">
+            <div class="p-2 bg-emerald-500/10 text-emerald-600 rounded-xl">
+              <span class="material-icons text-xl">vaccines</span>
+            </div>
+            <span id="medicine-badge" class="text-[10px] px-2 py-0.5 font-bold rounded-full bg-slate-100 text-slate-500">--</span>
+          </div>
+          <div class="mt-4">
+            <p class="text-xs text-slate-400 font-medium">💊 服藥紀錄</p>
+            <h3 id="medicine-value" class="text-2xl font-black text-slate-800 mt-1">--</h3>
+          </div>
+          <p class="text-[10px] text-slate-400 mt-2 flex items-center justify-between border-t border-slate-50 pt-2">
+            <span>更新：<span id="medicine-time">無</span></span>
+          </p>
+        </div>
+
+      </div>
+
+      <!-- 7日健康變化趨勢 (Chart.js) -->
+      <div class="bg-white rounded-2xl p-5 border border-slate-100 shadow-sm">
+        <div class="flex justify-between items-center mb-4">
+          <div>
+            <h3 class="font-bold text-slate-800 text-base">七日健康數位趨勢</h3>
+            <p class="text-[11px] text-slate-400">系統自動整合最近七次的照護週期事件</p>
+          </div>
+          <div class="flex space-x-2">
+            <span class="inline-flex items-center text-xs text-slate-500"><span class="w-2 h-2 rounded-full bg-blue-500 mr-1.5"></span>睡眠</span>
+            <span class="inline-flex items-center text-xs text-slate-500"><span class="w-2 h-2 rounded-full bg-pink-500 mr-1.5"></span>心情</span>
+          </div>
+        </div>
+        <div class="relative h-64 w-full">
+          <canvas id="careTrendChart"></canvas>
+        </div>
+      </div>
+
+    </section>
+
+    <!-- 右側：事件接收模擬、MQTT與開發控制台 (4行寬) -->
+    <section class="lg:col-span-4 flex flex-col space-y-6">
+
+      <!-- Event Hub 測試控制面板 -->
+      <div class="bg-white rounded-2xl p-5 border border-slate-100 shadow-sm">
+        <h3 class="font-bold text-slate-800 text-base mb-1 flex items-center">
+          <span class="material-icons text-brand-500 mr-1.5">hub</span>
+          Event Hub 接收模擬
+        </h3>
+        <p class="text-xs text-slate-400 mb-4">點擊下方模擬事件，不論來源均會發送至同一個 saveRecord 事件流</p>
+        
+        <!-- 睡眠事件組 -->
+        <div class="mb-4">
+          <label class="text-[11px] font-bold text-slate-400 uppercase tracking-wider block mb-2">😴 睡眠狀態事件模擬</label>
+          <div class="grid grid-cols-3 gap-2">
+            <button onclick="triggerEvent({sleep: 5, source: 'Kebbi (MQTT)'})" class="bg-blue-50 hover:bg-blue-100 text-blue-700 text-xs font-semibold py-2 px-1 rounded-xl border border-blue-200/50 transition-colors flex flex-col items-center">
+              <span>很好 (5)</span>
+            </button>
+            <button onclick="triggerEvent({sleep: 3, source: 'Kebbi (MQTT)'})" class="bg-slate-50 hover:bg-slate-100 text-slate-600 text-xs font-semibold py-2 px-1 rounded-xl border border-slate-200/50 transition-colors flex flex-col items-center">
+              <span>普通 (3)</span>
+            </button>
+            <button onclick="triggerEvent({sleep: 1, source: 'Kebbi (MQTT)'})" class="bg-rose-50 hover:bg-rose-100 text-rose-700 text-xs font-semibold py-2 px-1 rounded-xl border border-rose-200/50 transition-colors flex flex-col items-center">
+              <span>不好 (1)</span>
+            </button>
+          </div>
+        </div>
+
+        <!-- 早餐事件組 -->
+        <div class="mb-4">
+          <label class="text-[11px] font-bold text-slate-400 uppercase tracking-wider block mb-2">🍚 早餐用餐事件模擬</label>
+          <div class="grid grid-cols-2 gap-2">
+            <button onclick="triggerEvent({breakfast: 1, source: 'ESP32 餐桌感測器'})" class="bg-amber-50 hover:bg-amber-100 text-amber-700 text-xs font-semibold py-2 px-2 rounded-xl border border-amber-200/50 transition-colors flex flex-col items-center">
+              <span>已完整進食 (1)</span>
+            </button>
+            <button onclick="triggerEvent({breakfast: 0, source: 'ESP32 餐桌感測器'})" class="bg-slate-50 hover:bg-slate-100 text-slate-600 text-xs font-semibold py-2 px-2 rounded-xl border border-slate-200/50 transition-colors flex flex-col items-center">
+              <span>未用餐 (0)</span>
+            </button>
+          </div>
+        </div>
+
+        <!-- 心情事件組 -->
+        <div class="mb-4">
+          <label class="text-[11px] font-bold text-slate-400 uppercase tracking-wider block mb-2">😊 長輩今日心情模擬</label>
+          <div class="grid grid-cols-3 gap-2">
+            <button onclick="triggerEvent({mood: 5, source: 'Kebbi 表情識別'})" class="bg-pink-50 hover:bg-pink-100 text-pink-700 text-xs font-semibold py-2 px-1 rounded-xl border border-pink-200/50 transition-colors flex flex-col items-center">
+              <span>愉快 (5)</span>
+            </button>
+            <button onclick="triggerEvent({mood: 3, source: 'Kebbi 表情識別'})" class="bg-slate-50 hover:bg-slate-100 text-slate-600 text-xs font-semibold py-2 px-1 rounded-xl border border-slate-200/50 transition-colors flex flex-col items-center">
+              <span>平靜 (3)</span>
+            </button>
+            <button onclick="triggerEvent({mood: 1, source: 'Kebbi 表情識別'})" class="bg-amber-50 hover:bg-amber-100 text-amber-700 text-xs font-semibold py-2 px-1 rounded-xl border border-amber-200/50 transition-colors flex flex-col items-center">
+              <span>焦慮 (1)</span>
+            </button>
+          </div>
+        </div>
+
+        <!-- 服藥事件組 -->
+        <div class="mb-4">
+          <label class="text-[11px] font-bold text-slate-400 uppercase tracking-wider block mb-2">💊 智慧藥盒服藥模擬</label>
+          <div class="grid grid-cols-2 gap-2">
+            <button onclick="triggerEvent({medicine: 1, source: 'IoT 智慧藥盒'})" class="bg-emerald-50 hover:bg-emerald-100 text-emerald-700 text-xs font-semibold py-2 px-2 rounded-xl border border-emerald-200/50 transition-colors flex flex-col items-center">
+              <span>已按時服藥 (1)</span>
+            </button>
+            <button onclick="triggerEvent({medicine: 0, source: 'IoT 智慧藥盒'})" class="bg-rose-50 hover:bg-rose-100 text-rose-700 text-xs font-semibold py-2 px-2 rounded-xl border border-rose-200/50 transition-colors flex flex-col items-center">
+              <span>忘記服藥 (0)</span>
+            </button>
+          </div>
+        </div>
+
+        <!-- 自訂綜合事件 (開發測試) -->
+        <div class="border-t border-slate-100 pt-4 mt-2">
+          <button onclick="openCustomEventModal()" class="w-full bg-slate-900 hover:bg-slate-800 text-white text-xs font-semibold py-2.5 px-4 rounded-xl transition-colors flex items-center justify-center shadow-sm">
+            <span class="material-icons text-sm mr-1.5">tune</span> 自訂多載荷 Event 發送
+          </button>
+        </div>
+      </div>
+
+      <!-- Live Event Console (日誌主控台) -->
+      <div class="bg-slate-900 rounded-2xl p-4 text-slate-200 shadow-md flex flex-col h-[280px]">
+        <div class="flex justify-between items-center mb-2 pb-2 border-b border-slate-800">
+          <span class="text-xs font-bold text-brand-400 flex items-center">
+            <span class="material-icons text-sm mr-1 animate-pulse text-red-500 animate-ping">radio_button_checked</span>
+            Event Hub Live Log
+          </span>
+          <button onclick="clearLogs()" class="text-[10px] text-slate-400 hover:text-slate-200 transition-colors">清除記錄</button>
+        </div>
+        <div id="event-logs" class="flex-grow overflow-y-auto text-[11px] font-mono space-y-1.5 custom-scrollbar">
+          <div class="text-slate-500">[System] Event Hub 終端已就緒...</div>
+          <div class="text-slate-500">[System] 雙模同步就緒：自動檢測本機與 GAS 雲端模式</div>
+        </div>
+      </div>
+
+      <!-- Gemini AI 進階深度照護報告 (可選 API 金鑰) -->
+      <div class="bg-gradient-to-br from-indigo-900 to-slate-900 rounded-2xl p-5 text-white shadow-lg relative overflow-hidden">
+        <div class="absolute -right-6 -bottom-6 w-24 h-24 bg-brand-500/10 rounded-full blur-xl"></div>
+        <h3 class="font-bold text-sm mb-1 flex items-center text-brand-300">
+          <span class="material-icons mr-1.5 text-base">auto_awesome</span>
+          Gemini 深度健康週報
+        </h3>
+        <p class="text-[11px] text-slate-300 mb-4">使用 AI 對長輩近期健康趨勢進行多維度分析並產出給家屬的報告。</p>
+        
+        <div class="space-y-3">
+          <div>
+            <label class="text-[9px] font-bold text-slate-400 block mb-1">GEMINI API KEY (選填 - 預設使用內建模擬摘要)</label>
+            <input type="password" id="gemini-key" placeholder="貼上 API 金鑰 (選填)" class="w-full bg-white/10 border border-white/20 rounded-xl px-3 py-1.5 text-xs text-white placeholder-white/30 focus:outline-none focus:ring-2 focus:ring-brand-400">
+          </div>
+          <button id="btn-generate-ai" onclick="generateAISummaryReport()" class="w-full bg-brand-500 hover:bg-brand-600 text-white text-xs font-bold py-2 px-4 rounded-xl transition-all duration-200 flex items-center justify-center shadow-lg shadow-brand-500/20">
+            <span class="material-icons text-sm mr-1.5">analytics</span> 一鍵產出 AI 家屬報告
+          </button>
+        </div>
+      </div>
+
+    </section>
+
+  </main>
+
+  <!-- 底部版權 -->
+  <footer class="bg-white border-t border-slate-100 py-4 mt-8">
+    <div class="max-w-7xl mx-auto px-4 text-center text-xs text-slate-400">
+      <p>© 2026 Kebbi Care+ AI 家庭數位分身系統 | 高擴充性照護事件接收中心 (Event Hub)</p>
+    </div>
+  </footer>
+
+  <!-- 自訂事件 Modal -->
+  <div id="custom-event-modal" class="fixed inset-0 bg-slate-900/60 backdrop-blur-sm z-50 flex items-center justify-center opacity-0 pointer-events-none transition-opacity duration-300">
+    <div class="bg-white rounded-3xl p-6 max-w-md w-full mx-4 shadow-2xl border border-slate-100 transform scale-95 transition-transform duration-300">
+      <div class="flex justify-between items-center mb-4">
+        <h4 class="font-bold text-lg text-slate-800">自訂 Event Payload</h4>
+        <button onclick="closeCustomEventModal()" class="text-slate-400 hover:text-slate-600"><span class="material-icons">close</span></button>
+      </div>
+      
+      <div class="space-y-3.5 text-sm">
+        <div>
+          <label class="block text-xs font-semibold text-slate-500 mb-1">事件來源 (Source)</label>
+          <input id="custom-source" type="text" value="ESP32_SmartBed" class="w-full border border-slate-200 rounded-xl px-3 py-2 text-slate-700 focus:ring-2 focus:ring-brand-500 focus:outline-none">
+        </div>
+        <div class="grid grid-cols-2 gap-3">
+          <div>
+            <label class="block text-xs font-semibold text-slate-500 mb-1">睡眠 (1-5)</label>
+            <input id="custom-sleep" type="number" min="1" max="5" value="4" class="w-full border border-slate-200 rounded-xl px-3 py-2 text-slate-700 focus:ring-2 focus:ring-brand-500 focus:outline-none">
+          </div>
+          <div>
+            <label class="block text-xs font-semibold text-slate-500 mb-1">心情 (1-5)</label>
+            <input id="custom-mood" type="number" min="1" max="5" value="4" class="w-full border border-slate-200 rounded-xl px-3 py-2 text-slate-700 focus:ring-2 focus:ring-brand-500 focus:outline-none">
+          </div>
+        </div>
+        <div class="grid grid-cols-2 gap-3">
+          <div>
+            <label class="block text-xs font-semibold text-slate-500 mb-1">早餐食量 (0/1)</label>
+            <select id="custom-breakfast" class="w-full border border-slate-200 rounded-xl px-3 py-2 text-slate-700 focus:ring-2 focus:ring-brand-500 focus:outline-none">
+              <option value="1">已完整用餐 (1)</option>
+              <option value="0">未用餐 (0)</option>
+            </select>
+          </div>
+          <div>
+            <label class="block text-xs font-semibold text-slate-500 mb-1">服藥 (0/1)</label>
+            <select id="custom-medicine" class="w-full border border-slate-200 rounded-xl px-3 py-2 text-slate-700 focus:ring-2 focus:ring-brand-500 focus:outline-none">
+              <option value="1">已服藥 (1)</option>
+              <option value="0">未服藥 (0)</option>
+            </select>
+          </div>
+        </div>
+      </div>
+
+      <div class="mt-6 flex space-x-3">
+        <button onclick="closeCustomEventModal()" class="flex-1 border border-slate-200 hover:bg-slate-50 text-slate-500 font-semibold py-2.5 rounded-xl transition-colors">取消</button>
+        <button onclick="submitCustomEvent()" class="flex-1 bg-brand-500 hover:bg-brand-600 text-white font-semibold py-2.5 rounded-xl transition-colors">送出事件</button>
+      </div>
+    </div>
+  </div>
+
+  <!-- JS 控制核心與雙模運作邏輯 -->
+  <script>
+    // ==========================================
+    // 1. 全域變數與系統檢測
+    // ==========================================
+    let isGAS = typeof google !== 'undefined' && google.script && google.script.run;
+    let localDB = [];
+    let careChartInstance = null;
+
+    // 當前照護狀態暫存
+    let currentStatus = {
+      sleep: 3,
+      breakfast: 1,
+      mood: 4,
+      medicine: 1,
+      summary: "系統正等待您輸入第一筆照護事件，將自動產出 AI 即時照護評估。",
+      time: "--"
+    };
+
+    // ==========================================
+    // 2. 初始化流程
+    // ==========================================
+    window.onload = function() {
+      logConsole("[System] 系統初始化中...");
+      
+      if (isGAS) {
+        document.getElementById('connection-status').innerText = "雲端試算表模式";
+        document.getElementById('connection-dot').className = "relative inline-flex rounded-full h-2.5 w-2.5 bg-indigo-500";
+        logConsole("[System] 偵測到執行環境為 Google Web App，啟用試算表同步。");
+        fetchGASData();
+      } else {
+        document.getElementById('connection-status').innerText = "本機離線模擬模式";
+        document.getElementById('connection-dot').className = "relative inline-flex rounded-full h-2.5 w-2.5 bg-amber-500";
+        logConsole("[System] 執行在獨立瀏覽器環境。已為您啟動高模擬 LocalStorage 照護資料庫。");
+        loadMockData();
+      }
+    };
+
+    // ==========================================
+    // 3. 資料載入與模擬邏輯 (GAS vs LocalStorage)
+    // ==========================================
+    function loadMockData() {
+      const stored = localStorage.getItem('kebbi_care_records');
+      if (stored) {
+        localDB = JSON.parse(stored);
+        logConsole(`[Database] 成功載入 ${localDB.length} 筆歷史資料。`);
+      } else {
+        // 生成 7 天份的高逼真度模擬數據
+        const now = new Date();
+        for (let i = 6; i >= 0; i--) {
+          const date = new Date(now);
+          date.setDate(now.getDate() - i);
+          const dateStr = date.toLocaleDateString('zh-TW', {year: 'numeric', month: '2-digit', day: '2-digit'});
+          localDB.push({
+            date: dateStr,
+            time: "08:30:00",
+            sleep: Math.floor(Math.random() * 3) * 2 + 1, // 1, 3, 5
+            breakfast: Math.random() > 0.3 ? 1 : 0,
+            mood: Math.floor(Math.random() * 3) * 2 + 1, // 1, 3, 5
+            medicine: Math.random() > 0.15 ? 1 : 0,
+            summary: "模擬歷史數據載入...",
+            source: i === 0 ? "Web App" : "Kebbi (MQTT)"
+          });
+        }
+        localStorage.setItem('kebbi_care_records', JSON.stringify(localDB));
+        logConsole("[Database] 初始化 7 日基本模擬健康數據。");
+      }
+      
+      // 更新 UI 與圖表
+      if (localDB.length > 0) {
+        const last = localDB[localDB.length - 1];
+        currentStatus = {
+          sleep: last.sleep,
+          breakfast: last.breakfast,
+          mood: last.mood,
+          medicine: last.medicine,
+          summary: last.summary === "模擬歷史數據載入..." ? generateLocalSmartSummary(last) : last.summary,
+          time: last.time
+        };
+      }
+      updateUI();
+      renderChart(localDB);
+    }
+
+    function fetchGASData() {
+      logConsole("[GAS] 正在從雲端試算表獲取歷史資料...");
+      google.script.run
+        .withSuccessHandler(function(history) {
+          if (history && history.length > 0) {
+            logConsole(`[GAS] 獲取成功！共有 ${history.length} 筆歷史資料。`);
+            localDB = history;
+            
+            const last = history[history.length - 1];
+            currentStatus = {
+              sleep: last.sleep,
+              breakfast: last.breakfast,
+              mood: last.mood,
+              medicine: last.medicine,
+              summary: last.summary,
+              time: last.time
+            };
+            
+            updateUI();
+            renderChart(history);
+          } else {
+            logConsole("[GAS] 目前尚無試算表數據，請發送首筆事件進行建立。");
+            loadMockData(); // 若為空則回退到模擬
+          }
+        })
+        .withFailureHandler(function(err) {
+          logConsole(`[GAS] 獲取雲端資料失敗: ${err}。切換為離線模式。`);
+          loadMockData();
+        })
+        .getHistoryRecords();
+    }
+
+    // ==========================================
+    // 4. 事件接收核心 (Event Hub Event Handler)
+    // ==========================================
+    function triggerEvent(incomingPayload) {
+      logConsole(`[Event Received] 來源: ${incomingPayload.source} 接收到事件載荷: ${JSON.stringify(incomingPayload)}`);
+      
+      // 1. 合併更新目前的數位分身實體狀態
+      if (incomingPayload.sleep !== undefined) currentStatus.sleep = incomingPayload.sleep;
+      if (incomingPayload.breakfast !== undefined) currentStatus.breakfast = incomingPayload.breakfast;
+      if (incomingPayload.mood !== undefined) currentStatus.mood = incomingPayload.mood;
+      if (incomingPayload.medicine !== undefined) currentStatus.medicine = incomingPayload.medicine;
+      
+      // 2. 獲取本地時間
+      const now = new Date();
+      currentStatus.time = now.toTimeString().split(' ')[0];
+      
+      // 3. 事件智能編譯：自動產生 AI 本地溫暖摘要
+      currentStatus.summary = generateLocalSmartSummary(currentStatus);
+      
+      // 4. 打包最終 Event Payload 準備寫入 (與雲端格式相同)
+      const finalRecord = {
+        sleep: currentStatus.sleep,
+        breakfast: currentStatus.breakfast,
+        mood: currentStatus.mood,
+        medicine: currentStatus.medicine,
+        summary: currentStatus.summary,
+        source: incomingPayload.source || "Event Hub"
+      };
+      
+      logConsole(`[Event Hub] 事件正在派送並呼叫 saveRecord()...`);
+      
+      // 5. 根據雙模環境派送寫入
+      if (isGAS) {
+        google.script.run
+          .withSuccessHandler(function(res) {
+            if (res.success) {
+              logConsole(`[GAS 雲端] 同步完成！試算表已成功追加一列資料。`);
+              // 重新拉取一次確保圖表更新
+              fetchGASData();
+            } else {
+              logConsole(`[GAS 雲端錯誤] 儲存失敗: ${res.message}`);
+            }
+          })
+          .withFailureHandler(function(err) {
+            logConsole(`[GAS 網路錯誤] 調用失敗: ${err}`);
+          })
+          .saveRecord(finalRecord);
+      } else {
+        // 本地模擬寫入
+        const dateStr = now.toLocaleDateString('zh-TW', {year: 'numeric', month: '2-digit', day: '2-digit'});
+        const newRecord = {
+          date: dateStr,
+          time: currentStatus.time,
+          ...finalRecord
+        };
+        
+        localDB.push(newRecord);
+        // 只保留最近 15 筆在 memory/localstorage 避免爆掉
+        if (localDB.length > 15) localDB.shift();
+        localStorage.setItem('kebbi_care_records', JSON.stringify(localDB));
+        
+        logConsole(`[Database 模擬] 已成功寫入一筆事件。當前資料庫筆數：${localDB.length}`);
+        
+        updateUI();
+        renderChart(localDB);
+      }
+    }
+
+    // ==========================================
+    // 5. 智慧本地照護摘要翻譯器
+    // ==========================================
+    function generateLocalSmartSummary(state) {
+      let sleepDesc = state.sleep === 5 ? "昨晚睡得非常香甜沉穩" : (state.sleep === 3 ? "昨夜睡眠品質普通，有短暫醒來" : "昨夜似乎有些失眠或翻覆，精神較累");
+      let breakfastDesc = state.breakfast === 1 ? "早點已經完全吃光光了" : "早餐吃得比較少或尚未用餐，提醒要注意營養";
+      let moodDesc = state.mood === 5 ? "整天笑容滿面，心情特別愉快" : (state.mood === 3 ? "情緒相當平穩安靜" : "看起來有些煩躁或提不起勁");
+      let medicineDesc = state.medicine === 1 ? "且已按時服用上午的保健藥物，非常棒！" : "但目前尚未感應到服藥，記得要提醒服用藥物。";
+      
+      return `【AI 本地快報】長輩今日${sleepDesc}，${breakfastDesc}。心情上${moodDesc}，${medicineDesc} 建議家人可以撥個視訊電話，送上今日暖心問候喔！`;
+    }
+
+    // ==========================================
+    // 6. UI 面板更新渲染
+    // ==========================================
+    function updateUI() {
+      // 1. 更新卡片核心數值與動畫顏色
+      
+      // 睡眠
+      const sleepText = currentStatus.sleep === 5 ? "良好 (5)" : (currentStatus.sleep === 3 ? "普通 (3)" : "欠佳 (1)");
+      document.getElementById('sleep-value').innerText = sleepText;
+      document.getElementById('sleep-time').innerText = currentStatus.time;
+      const sleepBadge = document.getElementById('sleep-badge');
+      sleepBadge.innerText = `指數: ${currentStatus.sleep}`;
+      setCardStatusColor(sleepBadge, currentStatus.sleep >= 4 ? 'emerald' : (currentStatus.sleep >= 3 ? 'slate' : 'rose'));
+
+      // 早餐
+      const bfText = currentStatus.breakfast === 1 ? "已完成" : "未完成";
+      document.getElementById('breakfast-value').innerText = bfText;
+      document.getElementById('breakfast-time').innerText = currentStatus.time;
+      const bfBadge = document.getElementById('breakfast-badge');
+      bfBadge.innerText = currentStatus.breakfast === 1 ? "已進食" : "待用餐";
+      setCardStatusColor(bfBadge, currentStatus.breakfast === 1 ? 'emerald' : 'amber');
+
+      // 心情
+      const moodText = currentStatus.mood === 5 ? "愉快 (5)" : (currentStatus.mood === 3 ? "平靜 (3)" : "焦慮 (1)");
+      document.getElementById('mood-value').innerText = moodText;
+      document.getElementById('mood-time').innerText = currentStatus.time;
+      const moodBadge = document.getElementById('mood-badge');
+      moodBadge.innerText = `情緒: ${currentStatus.mood}`;
+      setCardStatusColor(moodBadge, currentStatus.mood >= 4 ? 'emerald' : (currentStatus.mood >= 3 ? 'slate' : 'rose'));
+
+      // 藥物
+      const medText = currentStatus.medicine === 1 ? "已按時服藥" : "尚未服藥";
+      document.getElementById('medicine-value').innerText = medText;
+      document.getElementById('medicine-time').innerText = currentStatus.time;
+      const medBadge = document.getElementById('medicine-badge');
+      medBadge.innerText = currentStatus.medicine === 1 ? "完成" : "漏服警告";
+      setCardStatusColor(medBadge, currentStatus.medicine === 1 ? 'emerald' : 'rose');
+
+      // 2. 更新 AI 今日摘要區
+      document.getElementById('ai-today-summary').innerText = currentStatus.summary;
+    }
+
+    function setCardStatusColor(element, type) {
+      if (type === 'emerald') {
+        element.className = "text-[10px] px-2 py-0.5 font-bold rounded-full bg-emerald-50 text-emerald-600 pulse-green";
+      } else if (type === 'amber') {
+        element.className = "text-[10px] px-2 py-0.5 font-bold rounded-full bg-amber-50 text-amber-600";
+      } else if (type === 'rose') {
+        element.className = "text-[10px] px-2 py-0.5 font-bold rounded-full bg-rose-50 text-rose-600 pulse-green";
+      } else {
+        element.className = "text-[10px] px-2 py-0.5 font-bold rounded-full bg-slate-50 text-slate-500";
+      }
+    }
+
+    // ==========================================
+    // 7. Chart.js 健康趨勢圖渲染
+    // ==========================================
+    function renderChart(historyData) {
+      const ctx = document.getElementById('careTrendChart').getContext('2d');
+      
+      // 整理 Chart 資料
+      // 如果資料不足 7 筆，補足，或直接有多少顯示多少
+      const labels = historyData.map(d => {
+        // 取日期的月/日，以及時間
+        const parts = d.date.split('/');
+        return parts.length >= 3 ? `${parts[1]}/${parts[2]}` : d.date;
+      });
+      const sleepData = historyData.map(d => d.sleep);
+      const moodData = historyData.map(d => d.mood);
+
+      if (careChartInstance) {
+        careChartInstance.destroy();
+      }
+
+      careChartInstance = new Chart(ctx, {
+        type: 'line',
+        data: {
+          labels: labels,
+          datasets: [
+            {
+              label: '昨晚睡眠品質指數 (1-5)',
+              data: sleepData,
+              borderColor: '#0ea5e9',
+              backgroundColor: 'rgba(14, 165, 233, 0.05)',
+              borderWidth: 3,
+              tension: 0.35,
+              fill: true,
+              pointBackgroundColor: '#0ea5e9',
+              pointRadius: 4,
+            },
+            {
+              label: '今日情緒感受指數 (1-5)',
+              data: moodData,
+              borderColor: '#ec4899',
+              backgroundColor: 'rgba(236, 72, 153, 0.05)',
+              borderWidth: 3,
+              tension: 0.35,
+              fill: true,
+              pointBackgroundColor: '#ec4899',
+              pointRadius: 4,
+            }
+          ]
+        },
+        options: {
+          responsive: true,
+          maintainAspectRatio: false,
+          plugins: {
+            legend: {
+              display: false // 在上方自訂了 Legend
+            }
+          },
+          scales: {
+            y: {
+              min: 0,
+              max: 5,
+              ticks: {
+                stepSize: 1,
+                font: { size: 10 }
+              },
+              grid: {
+                color: '#f1f5f9'
+              }
+            },
+            x: {
+              ticks: {
+                font: { size: 10 }
+              },
+              grid: {
+                display: false
+              }
+            }
+          }
+        }
+      });
+    }
+
+    // ==========================================
+    // 8. 終端控制台 (Log Engine)
+    // ==========================================
+    function logConsole(message) {
+      const consoleEl = document.getElementById('event-logs');
+      const timeStr = new Date().toTimeString().split(' ')[0];
+      const newLog = document.createElement('div');
+      newLog.className = "hover:bg-slate-800 py-0.5 px-1 rounded transition-colors";
+      
+      // 給予特定顏色的 log 識別
+      if (message.includes("[Event Received]")) {
+        newLog.innerHTML = `<span class="text-emerald-400">[${timeStr}]</span> <span class="text-amber-300 font-bold">${message}</span>`;
+      } else if (message.includes("[GAS]")) {
+        newLog.innerHTML = `<span class="text-indigo-400">[${timeStr}]</span> <span class="text-indigo-300">${message}</span>`;
+      } else if (message.includes("[System]")) {
+        newLog.innerHTML = `<span class="text-slate-500">[${timeStr}]</span> <span class="text-slate-300">${message}</span>`;
+      } else {
+        newLog.innerHTML = `<span class="text-slate-500">[${timeStr}]</span> ${message}`;
+      }
+      
+      consoleEl.appendChild(newLog);
+      consoleEl.scrollTop = consoleEl.scrollHeight;
+    }
+
+    function clearLogs() {
+      document.getElementById('event-logs').innerHTML = `<div class="text-slate-500">[System] 日誌主控台已清空。</div>`;
+    }
+
+    // ==========================================
+    // 9. 自訂事件 Modal 控制
+    // ==========================================
+    function openCustomEventModal() {
+      const modal = document.getElementById('custom-event-modal');
+      modal.classList.remove('opacity-0', 'pointer-events-none');
+      modal.querySelector('div').classList.remove('scale-95');
+      modal.querySelector('div').classList.add('scale-100');
+    }
+
+    function closeCustomEventModal() {
+      const modal = document.getElementById('custom-event-modal');
+      modal.classList.add('opacity-0', 'pointer-events-none');
+      modal.querySelector('div').classList.remove('scale-100');
+      modal.querySelector('div').classList.add('scale-95');
+    }
+
+    function submitCustomEvent() {
+      const source = document.getElementById('custom-source').value;
+      const sleep = parseInt(document.getElementById('custom-sleep').value);
+      const mood = parseInt(document.getElementById('custom-mood').value);
+      const breakfast = parseInt(document.getElementById('custom-breakfast').value);
+      const medicine = parseInt(document.getElementById('custom-medicine').value);
+      
+      triggerEvent({
+        source: source,
+        sleep: sleep,
+        mood: mood,
+        breakfast: breakfast,
+        medicine: medicine
+      });
+      
+      closeCustomEventModal();
+    }
+
+    // ==========================================
+    // 10. 深度整合：Gemini 2.5 API 週報報告生成
+    // ==========================================
+    async function generateAISummaryReport() {
+      const btn = document.getElementById('btn-generate-ai');
+      const origText = btn.innerHTML;
+      const keyInput = document.getElementById('gemini-key').value.trim();
+      
+      btn.disabled = true;
+      btn.innerHTML = `<svg class="animate-spin -ml-1 mr-2 h-4 w-4 text-white inline-block" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24"><circle class="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" stroke-width="4"></circle><path class="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path></svg> AI 正在精算分析中...`;
+      logConsole("[Gemini AI] 正在收集最近七次健康趨勢快照...");
+
+      try {
+        // 1. 整理歷史趨勢以做為 Context 丟給 LLM
+        const historyContext = localDB.slice(-7).map(d => ({
+          日期: d.date,
+          時間: d.time,
+          睡眠指數: d.sleep,
+          心情指數: d.mood,
+          早餐是否完成: d.breakfast === 1 ? '是' : '否',
+          服藥是否完成: d.medicine === 1 ? '是' : '否',
+          資料接收器: d.source
+        }));
+
+        const systemPrompt = "你是一位充滿熱忱、語調極其溫柔體貼的「高齡家庭照護數位分身 AI」。你的任務是閱讀最近的健康事件數據，為「家屬」撰寫一份精簡、溫暖、專業的照護總覽分析，字數約在150字內，著重於給家屬一兩個溫馨的小建議。";
+        const userQuery = `請分析以下長輩最近 7 次事件的照護週報數據：\n${JSON.stringify(historyContext, null, 2)}\n\n請以親切關懷的繁體中文口吻產出給家屬的報告。`;
+
+        if (keyInput === "") {
+          // ==========================================
+          // 模擬機制：若無填寫 API 金鑰，使用優雅的本機模擬延遲產出
+          // ==========================================
+          await new Promise(resolve => setTimeout(resolve, 1800));
+          
+          let avgSleep = (historyContext.reduce((acc, c) => acc + c.睡眠指數, 0) / historyContext.length).toFixed(1);
+          let avgMood = (historyContext.reduce((acc, c) => acc + c.心情指數, 0) / historyContext.length).toFixed(1);
+          let medComp = ((historyContext.filter(c => c.服藥是否完成 === '是').length / historyContext.length) * 100).toFixed(0);
+          
+          const simulatedResponse = `❤️ 【Gemini AI 數位分身週報報告】\n各位家屬您好！經分析長輩最近 7 次紀錄，睡眠指數平均落在良好的 ${avgSleep}/5 區間，心情則維持在平穩溫馨的 ${avgMood}/5。在智慧藥盒服藥遵循率上高達 ${medComp}%，表現極佳！近期長輩數位指標皆在安全範圍。建議週末多帶長輩到公園曬曬早晨太陽，能更有效延長夜晚深睡眠時間。`;
+          
+          document.getElementById('ai-today-summary').innerText = simulatedResponse;
+          currentStatus.summary = simulatedResponse;
+          logConsole("[Gemini AI] (模擬模式) 成功產出數位分身綜合健康週報報告。");
+        } else {
+          // ==========================================
+          // 真實呼叫：Gemini 2.5 API (依照 Canvas 規範使用 gemini-2.5-flash-preview-09-2025)
+          // ==========================================
+          const url = `https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-flash-preview-09-2025:generateContent?key=${keyInput}`;
+          const payload = {
+            contents: [{ parts: [{ text: userQuery }] }],
+            systemInstruction: { parts: [{ text: systemPrompt }] }
+          };
+
+          // 實作推薦的指數退避重試
+          let responseText = "";
+          let success = false;
+          let delay = 1000;
+
+          for (let attempt = 1; attempt <= 5; attempt++) {
+            try {
+              const response = await fetch(url, {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify(payload)
+              });
+              
+              if (response.ok) {
+                const result = await response.json();
+                responseText = result.candidates?.[0]?.content?.parts?.[0]?.text;
+                if (responseText) {
+                  success = true;
+                  break;
+                }
+              }
+            } catch (err) {
+              // 吞掉重試錯誤
+            }
+            if (!success) {
+              await new Promise(resolve => setTimeout(resolve, delay));
+              delay *= 2; // 指數退避
+            }
+          }
+
+          if (success) {
+            document.getElementById('ai-today-summary').innerText = responseText;
+            currentStatus.summary = responseText;
+            logConsole("[Gemini AI] 實時雲端分析成功！照護摘要已更新。");
+          } else {
+            throw new Error("超過重試限制，無法取得 Gemini 回應。");
+          }
+        }
+      } catch (error) {
+        logConsole(`[Gemini AI 錯誤] 請求失敗: ${error.message}。`);
+        document.getElementById('ai-today-summary').innerText = `⚠️ 串接 API 時遇到錯誤：${error.message}。請確認您的 API 金鑰是否輸入正確、網路通暢。`;
+      } finally {
+        btn.disabled = false;
+        btn.innerHTML = origText;
+      }
+    }
+  </script>
+</body>
+</html>
