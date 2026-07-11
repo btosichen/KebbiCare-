@@ -5,6 +5,7 @@
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
   <title>Kebbi Care+ AI 家庭數位分身</title>
   <!-- Tailwind CSS -->
+  <script src="https://unpkg.com/mqtt/dist/mqtt.min.js"></script>
   <script src="https://cdn.tailwindcss.com"></script>
   <!-- Chart.js -->
   <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
@@ -404,6 +405,12 @@
     // ==========================================
     // 1. 全域變數與系統檢測
     // ==========================================
+    //------------------------------------
+// MQTT
+//------------------------------------
+const MQTT_BROKER="wss://broker.emqx.io:8084/mqtt";
+const MQTT_TOPIC="halocode";
+let mqttClient=null;
     let isGAS = typeof google !== 'undefined' && google.script && google.script.run;
     let localDB = [];
     let careChartInstance = null;
@@ -435,6 +442,7 @@
         logConsole("[System] 執行在獨立瀏覽器環境。已為您啟動高模擬 LocalStorage 照護資料庫。");
         loadMockData();
       }
+      connectMQTT();
     };
 
     // ==========================================
@@ -630,7 +638,68 @@
         element.className = "text-[10px] px-2 py-0.5 font-bold rounded-full bg-slate-50 text-slate-500";
       }
     }
+function parseMQTT(msg){
 
+    //----------------------------------
+    // 純數字模式
+    //----------------------------------
+
+    switch(msg){
+
+        case "1":
+            triggerEvent({
+                sleep:1,
+                source:"MQTT"
+            });
+            break;
+
+        case "3":
+            triggerEvent({
+                sleep:3,
+                source:"MQTT"
+            });
+            break;
+
+        case "5":
+            triggerEvent({
+                sleep:5,
+                source:"MQTT"
+            });
+            break;
+
+        default:
+
+            //----------------------------------
+            // JSON模式
+            //----------------------------------
+
+            try{
+
+                let obj=JSON.parse(msg);
+
+                triggerEvent({
+
+                    sleep:obj.sleep,
+
+                    breakfast:obj.breakfast,
+
+                    mood:obj.mood,
+
+                    medicine:obj.medicine,
+
+                    source:"MQTT"
+
+                });
+
+            }catch(e){
+
+                logConsole("[MQTT] 未知格式："+msg);
+
+            }
+
+    }
+
+}
     // ==========================================
     // 7. Chart.js 健康趨勢圖渲染
     // ==========================================
@@ -744,7 +813,51 @@
       triggerEvent({ source, sleep, mood, breakfast, medicine });
       closeCustomEventModal();
     }
+//mq
+    //------------------------------------
+// MQTT 接收
+//------------------------------------
+function connectMQTT(){
 
+    logConsole("[MQTT] 準備連線 broker...");
+
+    mqttClient=mqtt.connect(MQTT_BROKER,{
+        clientId:"kebbi_"+Math.random().toString(16).substr(2,8),
+        clean:true,
+        reconnectPeriod:3000,
+        connectTimeout:10000,
+        keepalive:60
+    });
+
+    mqttClient.on("connect",()=>{
+
+        logConsole("[MQTT] 已連線");
+
+        document.getElementById("connection-status").innerText="MQTT 已連線";
+
+        mqttClient.subscribe(MQTT_TOPIC);
+
+        logConsole("[MQTT] 已訂閱 Topic："+MQTT_TOPIC);
+
+    });
+
+    mqttClient.on("message",(topic,payload)=>{
+
+        let msg=payload.toString();
+
+        logConsole("[MQTT] 收到："+msg);
+
+        parseMQTT(msg);
+
+    });
+
+    mqttClient.on("error",(err)=>{
+
+        logConsole("[MQTT Error] "+err.message);
+
+    });
+
+}
     // ==========================================
     // 10. 深度整合：Gemini 2.5 API 週報報告生成
     // ==========================================
