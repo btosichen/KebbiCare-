@@ -638,67 +638,63 @@ let mqttClient=null;
         element.className = "text-[10px] px-2 py-0.5 font-bold rounded-full bg-slate-50 text-slate-500";
       }
     }
-function parseMQTT(msg){
+function parseMQTT(message) {
+  const msg = String(message).trim();
 
-    //----------------------------------
-    // 純數字模式
-    //----------------------------------
+  // 純數字：先作為睡眠分數測試
+  if (msg === "1" || msg === "3" || msg === "5") {
+    triggerEvent({
+      sleep: Number(msg),
+      source: "Kebbi MQTT"
+    });
 
-    switch(msg){
+    return;
+  }
 
-        case "1":
-            triggerEvent({
-                sleep:1,
-                source:"MQTT"
-            });
-            break;
+  // JSON 完整資料
+  try {
+    const data = JSON.parse(msg);
+    const eventData = {
+      source: data.source || "Kebbi MQTT"
+    };
 
-        case "3":
-            triggerEvent({
-                sleep:3,
-                source:"MQTT"
-            });
-            break;
-
-        case "5":
-            triggerEvent({
-                sleep:5,
-                source:"MQTT"
-            });
-            break;
-
-        default:
-
-            //----------------------------------
-            // JSON模式
-            //----------------------------------
-
-            try{
-
-                let obj=JSON.parse(msg);
-
-                triggerEvent({
-
-                    sleep:obj.sleep,
-
-                    breakfast:obj.breakfast,
-
-                    mood:obj.mood,
-
-                    medicine:obj.medicine,
-
-                    source:"MQTT"
-
-                });
-
-            }catch(e){
-
-                logConsole("[MQTT] 未知格式："+msg);
-
-            }
-
+    if (data.sleep !== undefined) {
+      eventData.sleep = Number(data.sleep);
     }
 
+    if (data.breakfast !== undefined) {
+      eventData.breakfast = Number(data.breakfast);
+    }
+
+    if (data.mood !== undefined) {
+      eventData.mood = Number(data.mood);
+    }
+
+    if (data.medicine !== undefined) {
+      eventData.medicine = Number(data.medicine);
+    }
+
+    const hasCareData =
+      eventData.sleep !== undefined ||
+      eventData.breakfast !== undefined ||
+      eventData.mood !== undefined ||
+      eventData.medicine !== undefined;
+
+    if (!hasCareData) {
+      logConsole(
+        "[MQTT] JSON 中沒有可辨識的照護欄位。"
+      );
+      return;
+    }
+
+    triggerEvent(eventData);
+
+  } catch (error) {
+    logConsole(
+      "[MQTT] 無法辨識訊息格式：" +
+      msg
+    );
+  }
 }
     // ==========================================
     // 7. Chart.js 健康趨勢圖渲染
@@ -817,46 +813,105 @@ function parseMQTT(msg){
     //------------------------------------
 // MQTT 接收
 //------------------------------------
-function connectMQTT(){
+function connectMQTT() {
+  logConsole("[MQTT] 準備連線 Broker...");
 
-    logConsole("[MQTT] 準備連線 broker...");
+  if (typeof mqtt === "undefined") {
+    logConsole("[MQTT Error] MQTT.js 載入失敗。");
+    return;
+  }
 
-    mqttClient=mqtt.connect(MQTT_BROKER,{
-        clientId:"kebbi_"+Math.random().toString(16).substr(2,8),
-        clean:true,
-        reconnectPeriod:3000,
-        connectTimeout:10000,
-        keepalive:60
-    });
+  if (mqttClient) {
+    try {
+      mqttClient.end(true);
+    } catch (error) {
+      console.warn(error);
+    }
+  }
 
-    mqttClient.on("connect",()=>{
+  mqttClient = mqtt.connect(MQTT_BROKER, {
+    clientId:
+      "kebbi_" +
+      Math.random().toString(16).substring(2, 10),
 
-        logConsole("[MQTT] 已連線");
+    clean: true,
+    reconnectPeriod: 3000,
+    connectTimeout: 10000,
+    keepalive: 60
+  });
 
-        document.getElementById("connection-status").innerText="MQTT 已連線";
+  mqttClient.on("connect", function () {
+    logConsole("[MQTT] Broker 連線成功。");
 
-        mqttClient.subscribe(MQTT_TOPIC);
+    document.getElementById("connection-status").innerText =
+      "MQTT 已連線";
 
-        logConsole("[MQTT] 已訂閱 Topic："+MQTT_TOPIC);
+    document.getElementById("connection-dot").className =
+      "relative inline-flex rounded-full h-2.5 w-2.5 bg-emerald-500";
 
-    });
+    mqttClient.subscribe(
+      MQTT_TOPIC,
+      { qos: 0 },
+      function (error) {
+        if (error) {
+          logConsole(
+            "[MQTT Error] Topic 訂閱失敗：" +
+            error.message
+          );
+          return;
+        }
 
-    mqttClient.on("message",(topic,payload)=>{
+        logConsole(
+          "[MQTT] 已訂閱 Topic：" +
+          MQTT_TOPIC
+        );
+      }
+    );
+  });
 
-        let msg=payload.toString();
+  mqttClient.on("message", function (topic, payload) {
+    const message = payload.toString().trim();
 
-        logConsole("[MQTT] 收到："+msg);
+    logConsole(
+      `[MQTT] 收到 Topic=${topic}，訊息=${message}`
+    );
 
-        parseMQTT(msg);
+    parseMQTT(message);
+  });
 
-    });
+  mqttClient.on("reconnect", function () {
+    document.getElementById("connection-status").innerText =
+      "MQTT 重新連線中";
 
-    mqttClient.on("error",(err)=>{
+    logConsole("[MQTT] 正在重新連線...");
+  });
 
-        logConsole("[MQTT Error] "+err.message);
+  mqttClient.on("offline", function () {
+    document.getElementById("connection-status").innerText =
+      "MQTT 離線";
 
-    });
+    document.getElementById("connection-dot").className =
+      "relative inline-flex rounded-full h-2.5 w-2.5 bg-amber-500";
 
+    logConsole("[MQTT] Broker 暫時離線。");
+  });
+
+  mqttClient.on("close", function () {
+    logConsole("[MQTT] 連線已關閉。");
+  });
+
+  mqttClient.on("error", function (error) {
+    document.getElementById("connection-status").innerText =
+      "MQTT 連線錯誤";
+
+    document.getElementById("connection-dot").className =
+      "relative inline-flex rounded-full h-2.5 w-2.5 bg-rose-500";
+
+    logConsole(
+      "[MQTT Error] " +
+      error.message
+    );
+  });
 }
     // ==========================================
     // 10. 深度整合：Gemini 2.5 API 週報報告生成
