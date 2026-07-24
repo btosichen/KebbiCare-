@@ -444,6 +444,8 @@ const MQTT_BROKER = "wss://broker.emqx.io:8084/mqtt";
 const MQTT_TOPIC = "halocode";
 const MQTT_COMMAND_TOPIC = "halocode/kebbi/care/command";
 const MQTT_RESPONSE_TOPIC = "halocode/kebbi/care/response";
+// GitHub Pages 透過此 GAS Web App 寫入 Google 試算表。
+const GAS_WEB_APP_URL = "https://script.google.com/macros/s/AKfycbyx1gOGLwJNn325S-YZQOlUyYcbGt3uIr8jOZE6YFYb-erqFQ5QF2dxfloosF-TOpBK/exec";
 let mqttClient=null;
     let isGAS = typeof google !== 'undefined' && google.script && google.script.run;
     let localDB = [];
@@ -555,6 +557,22 @@ let mqttClient=null;
         .getHistoryRecords();
     }
 
+    // GitHub Pages 無法使用 google.script.run；改以 GAS doPost() 寫入試算表。
+    async function saveRecordToGAS(record) {
+      try {
+        await fetch(GAS_WEB_APP_URL, {
+          method: 'POST',
+          // Apps Script Web App 是跨網域端點；no-cors 讓公開 Web App 可接收請求。
+          mode: 'no-cors',
+          headers: { 'Content-Type': 'text/plain;charset=utf-8' },
+          body: JSON.stringify(record)
+        });
+        logConsole('[GAS API] 已送出試算表寫入請求。');
+      } catch (error) {
+        logConsole(`[GAS API 錯誤] 無法送出寫入請求：${error.message}`);
+      }
+    }
+
     // ==========================================
     // 4. 事件接收核心 (Event Hub Event Handler)
     // ==========================================
@@ -608,6 +626,7 @@ let mqttClient=null;
         localStorage.setItem('kebbi_care_records', JSON.stringify(localDB));
         
         logConsole(`[Database 模擬] 已成功寫入一筆事件。當前資料庫筆數：${localDB.length}`);
+        saveRecordToGAS(finalRecord);
         
         updateUI();
         renderChart(localDB);
