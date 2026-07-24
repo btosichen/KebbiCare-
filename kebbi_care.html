@@ -334,6 +334,9 @@
           <button type="button" onclick="sendCareCommand('medicine')" class="bg-emerald-50 hover:bg-emerald-100 text-emerald-700 text-xs font-bold py-3 px-2 rounded-2xl border border-emerald-100 transition-colors flex flex-col items-center gap-1" aria-label="請凱比詢問服藥狀況">
             <span class="text-xl" aria-hidden="true">💊</span><span>吃藥詢問</span>
           </button>
+          <button type="button" onclick="sendCareCommand('light')" class="col-span-2 bg-violet-50 hover:bg-violet-100 text-violet-700 text-xs font-bold py-3 px-2 rounded-2xl border border-violet-100 transition-colors flex items-center justify-center gap-2" aria-label="請凱比詢問是否需要開關燈">
+            <span class="text-xl" aria-hidden="true">💡</span><span>燈光詢問</span>
+          </button>
         </div>
       </div>
 
@@ -843,7 +846,8 @@ function clearLogs() {
       sleep: '睡眠詢問',
       breakfast: '早餐詢問',
       mood: '心情詢問',
-      medicine: '吃藥詢問'
+      medicine: '吃藥詢問',
+      light: '燈光詢問'
     };
 
     function setCareCommandStatus(text, color = 'slate') {
