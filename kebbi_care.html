@@ -118,6 +118,24 @@
           <span class="inline-block bg-brand-500 text-white text-[10px] font-bold px-2.5 py-1 rounded-full uppercase tracking-wider mb-3">AI Daily Insights</span>
           <h2 class="text-2xl font-bold text-slate-800 mb-1">今日照護總覽</h2>
           <p class="text-slate-500 text-sm mb-4">讓 AI 陪伴家人，把最溫暖、即時的關心帶回家</p>
+
+          <!-- 多人照護與環境感測預留欄位 -->
+          <div class="grid grid-cols-1 sm:grid-cols-2 gap-3 mb-4">
+            <div class="bg-gradient-to-r from-violet-500 to-indigo-500 rounded-2xl p-3.5 text-white shadow-md flex items-center gap-3">
+              <div class="w-11 h-11 rounded-2xl bg-white/20 flex items-center justify-center text-2xl" aria-hidden="true">🪪</div>
+              <div class="min-w-0">
+                <p class="text-[10px] font-bold tracking-wider text-violet-100">照護對象編號・號碼牌辨識</p>
+                <p id="elder-id-value" class="text-lg font-black tracking-wide truncate">尚未辨識</p>
+              </div>
+            </div>
+            <div class="bg-gradient-to-r from-orange-400 to-amber-400 rounded-2xl p-3.5 text-white shadow-md flex items-center gap-3">
+              <div class="w-11 h-11 rounded-2xl bg-white/20 flex items-center justify-center text-2xl" aria-hidden="true">🌡️</div>
+              <div class="min-w-0">
+                <p class="text-[10px] font-bold tracking-wider text-amber-50">室內溫度・環境感測預留</p>
+                <p id="indoor-temperature-value" class="text-lg font-black tracking-wide">-- °C</p>
+              </div>
+            </div>
+          </div>
           
           <div class="bg-white/80 backdrop-blur-sm p-4.5 rounded-2xl border border-white/60 shadow-inner flex items-start space-x-3">
             <div class="bg-amber-100 text-amber-600 p-2 rounded-xl mt-0.5">
@@ -460,6 +478,8 @@ let mqttClient=null;
       breakfast: 1,
       mood: 4,
       medicine: 1,
+      elderId: "尚未辨識",
+      indoorTemperature: null,
       summary: "系統正等待您輸入第一筆照護事件，將自動產出 AI 即時照護評估。",
       time: "--"
     };
@@ -505,6 +525,8 @@ let mqttClient=null;
             breakfast: Math.random() > 0.3 ? 1 : 0,
             mood: Math.floor(Math.random() * 3) * 2 + 1,
             medicine: Math.random() > 0.15 ? 1 : 0,
+            elderId: "尚未辨識",
+            indoorTemperature: null,
             summary: "模擬歷史數據載入...",
             source: i === 0 ? "Web App" : "Kebbi (MQTT)"
           });
@@ -520,6 +542,8 @@ let mqttClient=null;
           breakfast: last.breakfast,
           mood: last.mood,
           medicine: last.medicine,
+          elderId: last.elderId || "尚未辨識",
+          indoorTemperature: last.indoorTemperature ?? null,
           summary: last.summary === "模擬歷史數據載入..." ? generateLocalSmartSummary(last) : last.summary,
           time: last.time
         };
@@ -542,6 +566,8 @@ let mqttClient=null;
               breakfast: last.breakfast,
               mood: last.mood,
               medicine: last.medicine,
+              elderId: last.elderId || "尚未辨識",
+              indoorTemperature: last.indoorTemperature ?? null,
               summary: last.summary,
               time: last.time
             };
@@ -586,6 +612,9 @@ let mqttClient=null;
       if (incomingPayload.breakfast !== undefined) currentStatus.breakfast = incomingPayload.breakfast;
       if (incomingPayload.mood !== undefined) currentStatus.mood = incomingPayload.mood;
       if (incomingPayload.medicine !== undefined) currentStatus.medicine = incomingPayload.medicine;
+      if (incomingPayload.elderId !== undefined) currentStatus.elderId = String(incomingPayload.elderId);
+      if (incomingPayload.indoorTemperature !== undefined) currentStatus.indoorTemperature = Number(incomingPayload.indoorTemperature);
+      if (incomingPayload.temperature !== undefined) currentStatus.indoorTemperature = Number(incomingPayload.temperature);
       
       const now = new Date();
       currentStatus.time = now.toTimeString().split(' ')[0];
@@ -596,6 +625,8 @@ let mqttClient=null;
         breakfast: currentStatus.breakfast,
         mood: currentStatus.mood,
         medicine: currentStatus.medicine,
+        elderId: currentStatus.elderId,
+        indoorTemperature: currentStatus.indoorTemperature,
         summary: currentStatus.summary,
         source: incomingPayload.source || "Event Hub"
       };
@@ -680,6 +711,11 @@ let mqttClient=null;
       medBadge.innerText = currentStatus.medicine === 1 ? "完成" : "漏服警告";
       setCardStatusColor(medBadge, currentStatus.medicine === 1 ? 'emerald' : 'rose');
 
+      document.getElementById('elder-id-value').innerText = currentStatus.elderId || '尚未辨識';
+      document.getElementById('indoor-temperature-value').innerText = Number.isFinite(currentStatus.indoorTemperature)
+        ? `${currentStatus.indoorTemperature} °C`
+        : '-- °C';
+
       document.getElementById('ai-today-summary').innerText = currentStatus.summary;
     }
 
@@ -730,11 +766,23 @@ function parseMQTT(message) {
       eventData.medicine = Number(data.medicine);
     }
 
+    if (data.elderId !== undefined) {
+      eventData.elderId = String(data.elderId);
+    }
+
+    if (data.indoorTemperature !== undefined) {
+      eventData.indoorTemperature = Number(data.indoorTemperature);
+    } else if (data.temperature !== undefined) {
+      eventData.indoorTemperature = Number(data.temperature);
+    }
+
     const hasCareData =
       eventData.sleep !== undefined ||
       eventData.breakfast !== undefined ||
       eventData.mood !== undefined ||
-      eventData.medicine !== undefined;
+      eventData.medicine !== undefined ||
+      eventData.elderId !== undefined ||
+      eventData.indoorTemperature !== undefined;
 
     if (!hasCareData) {
       logConsole(
