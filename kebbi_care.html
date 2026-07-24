@@ -769,7 +769,7 @@ function parseMQTT(message) {
       }
 
       careChartInstance = new Chart(ctx, {
-        type: 'line',
+        type: 'bar',
         data: {
           labels: labels,
           datasets: [
@@ -777,23 +777,23 @@ function parseMQTT(message) {
               label: '昨晚睡眠品質指數 (1-5)',
               data: sleepData,
               borderColor: '#0ea5e9',
-              backgroundColor: 'rgba(14, 165, 233, 0.05)',
-              borderWidth: 3,
-              tension: 0.35,
-              fill: true,
-              pointBackgroundColor: '#0ea5e9',
-              pointRadius: 4,
+              backgroundColor: 'rgba(14, 165, 233, 0.78)',
+              borderWidth: 1,
+              borderRadius: 6,
+              borderSkipped: false,
+              barPercentage: 0.72,
+              categoryPercentage: 0.7,
             },
             {
               label: '今日情緒感受指數 (1-5)',
               data: moodData,
               borderColor: '#ec4899',
-              backgroundColor: 'rgba(236, 72, 153, 0.05)',
-              borderWidth: 3,
-              tension: 0.35,
-              fill: true,
-              pointBackgroundColor: '#ec4899',
-              pointRadius: 4,
+              backgroundColor: 'rgba(236, 72, 153, 0.78)',
+              borderWidth: 1,
+              borderRadius: 6,
+              borderSkipped: false,
+              barPercentage: 0.72,
+              categoryPercentage: 0.7,
             }
           ]
         },
