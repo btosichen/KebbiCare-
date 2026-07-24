@@ -306,6 +306,37 @@
         </div>
       </div>
 
+      <!-- 家人遠端控制凱比 -->
+      <div class="bg-gradient-to-br from-rose-50 via-white to-brand-50 rounded-2xl p-5 border border-rose-100 shadow-sm">
+        <div class="flex items-start justify-between gap-3 mb-2">
+          <div>
+            <h3 class="font-bold text-slate-800 text-base flex items-center">
+              <span class="material-icons text-rose-500 mr-1.5">smart_toy</span>
+              凱比暖心關懷遙控器
+            </h3>
+            <p class="text-xs text-slate-400 mt-1">家人一鍵請凱比主動關心；指令會經 MQTT 傳送到凱比。</p>
+          </div>
+          <span id="care-command-status" class="shrink-0 text-[10px] font-bold px-2 py-1 rounded-full bg-slate-100 text-slate-500">等待指令</span>
+        </div>
+        <div class="grid grid-cols-2 gap-2.5 mt-4">
+          <button type="button" onclick="sendCareCommand('auto')" class="col-span-2 bg-gradient-to-r from-rose-500 to-pink-500 hover:from-rose-600 hover:to-pink-600 text-white font-bold py-3 px-3 rounded-2xl shadow-sm transition-all hover:-translate-y-0.5 flex items-center justify-center gap-2" aria-label="請凱比依序進行四項照護詢問">
+            <span class="text-lg" aria-hidden="true">🤖💖</span><span>全自動暖心巡問</span>
+          </button>
+          <button type="button" onclick="sendCareCommand('sleep')" class="bg-blue-50 hover:bg-blue-100 text-blue-700 text-xs font-bold py-3 px-2 rounded-2xl border border-blue-100 transition-colors flex flex-col items-center gap-1" aria-label="請凱比詢問睡眠狀況">
+            <span class="text-xl" aria-hidden="true">😴</span><span>睡眠詢問</span>
+          </button>
+          <button type="button" onclick="sendCareCommand('breakfast')" class="bg-amber-50 hover:bg-amber-100 text-amber-700 text-xs font-bold py-3 px-2 rounded-2xl border border-amber-100 transition-colors flex flex-col items-center gap-1" aria-label="請凱比詢問早餐狀況">
+            <span class="text-xl" aria-hidden="true">🍳</span><span>早餐詢問</span>
+          </button>
+          <button type="button" onclick="sendCareCommand('mood')" class="bg-pink-50 hover:bg-pink-100 text-pink-700 text-xs font-bold py-3 px-2 rounded-2xl border border-pink-100 transition-colors flex flex-col items-center gap-1" aria-label="請凱比詢問心情">
+            <span class="text-xl" aria-hidden="true">😊</span><span>心情詢問</span>
+          </button>
+          <button type="button" onclick="sendCareCommand('medicine')" class="bg-emerald-50 hover:bg-emerald-100 text-emerald-700 text-xs font-bold py-3 px-2 rounded-2xl border border-emerald-100 transition-colors flex flex-col items-center gap-1" aria-label="請凱比詢問服藥狀況">
+            <span class="text-xl" aria-hidden="true">💊</span><span>吃藥詢問</span>
+          </button>
+        </div>
+      </div>
+
       <!-- Live Event Console (日誌主控台) -->
       <div class="bg-slate-900 rounded-2xl p-4 text-slate-200 shadow-md flex flex-col h-[280px]">
         <div class="flex justify-between items-center mb-2 pb-2 border-b border-slate-800">
@@ -408,8 +439,11 @@
     //------------------------------------
 // MQTT
 //------------------------------------
-const MQTT_BROKER="wss://broker.emqx.io:8084/mqtt";
-const MQTT_TOPIC="halocode";
+const MQTT_BROKER = "wss://broker.emqx.io:8084/mqtt";
+// 照護資料、遠端指令與凱比回覆分開使用，避免控制訊息被誤存成健康紀錄。
+const MQTT_TOPIC = "halocode";
+const MQTT_COMMAND_TOPIC = "halocode/kebbi/care/command";
+const MQTT_RESPONSE_TOPIC = "halocode/kebbi/care/response";
 let mqttClient=null;
     let isGAS = typeof google !== 'undefined' && google.script && google.script.run;
     let localDB = [];
@@ -778,8 +812,56 @@ function parseMQTT(message) {
       consoleEl.scrollTop = consoleEl.scrollHeight;
     }
 
-    function clearLogs() {
+function clearLogs() {
       document.getElementById('event-logs').innerHTML = `<div class="text-slate-500">[System] 日誌主控台已清空。</div>`;
+    }
+
+    // ==========================================
+    // 9. 家人遠端遙控凱比（MQTT Command Publisher）
+    // ==========================================
+    const careCommandLabels = {
+      auto: '全自動暖心巡問',
+      sleep: '睡眠詢問',
+      breakfast: '早餐詢問',
+      mood: '心情詢問',
+      medicine: '吃藥詢問'
+    };
+
+    function setCareCommandStatus(text, color = 'slate') {
+      const status = document.getElementById('care-command-status');
+      const colorClasses = {
+        slate: 'bg-slate-100 text-slate-500',
+        emerald: 'bg-emerald-50 text-emerald-600',
+        rose: 'bg-rose-50 text-rose-600',
+        brand: 'bg-brand-50 text-brand-600'
+      };
+      status.innerText = text;
+      status.className = `shrink-0 text-[10px] font-bold px-2 py-1 rounded-full ${colorClasses[color] || colorClasses.slate}`;
+    }
+
+    function sendCareCommand(action) {
+      if (!mqttClient || !mqttClient.connected) {
+        setCareCommandStatus('MQTT 尚未連線', 'rose');
+        logConsole('[MQTT Command] 無法送出：尚未連線到 Broker。');
+        return;
+      }
+
+      const command = {
+        type: 'care_command',
+        action: action,
+        requestedAt: new Date().toISOString(),
+        requestedBy: 'kebbi_care_web'
+      };
+
+      mqttClient.publish(MQTT_COMMAND_TOPIC, JSON.stringify(command), { qos: 1 }, function(error) {
+        if (error) {
+          setCareCommandStatus('傳送失敗', 'rose');
+          logConsole(`[MQTT Command] 傳送失敗：${error.message}`);
+          return;
+        }
+        setCareCommandStatus(`已請凱比：${careCommandLabels[action]}`, 'emerald');
+        logConsole(`[MQTT Command] 已傳送「${careCommandLabels[action]}」至 ${MQTT_COMMAND_TOPIC}`);
+      });
     }
 
     // ==========================================
@@ -850,7 +932,7 @@ function connectMQTT() {
       "relative inline-flex rounded-full h-2.5 w-2.5 bg-emerald-500";
 
     mqttClient.subscribe(
-      MQTT_TOPIC,
+      [MQTT_TOPIC, MQTT_RESPONSE_TOPIC],
       { qos: 0 },
       function (error) {
         if (error) {
@@ -862,8 +944,7 @@ function connectMQTT() {
         }
 
         logConsole(
-          "[MQTT] 已訂閱 Topic：" +
-          MQTT_TOPIC
+          "[MQTT] 已訂閱照護資料與凱比回覆 Topic。"
         );
       }
     );
@@ -875,6 +956,17 @@ function connectMQTT() {
     logConsole(
       `[MQTT] 收到 Topic=${topic}，訊息=${message}`
     );
+
+    if (topic === MQTT_RESPONSE_TOPIC) {
+      try {
+        const response = JSON.parse(message);
+        const label = careCommandLabels[response.action] || response.action || '照護詢問';
+        setCareCommandStatus(response.status === 'completed' ? `凱比完成：${label}` : `凱比執行中：${label}`, response.status === 'completed' ? 'emerald' : 'brand');
+      } catch (error) {
+        logConsole('[MQTT] 凱比回覆格式無法辨識。');
+      }
+      return;
+    }
 
     parseMQTT(message);
   });
