@@ -228,20 +228,29 @@
 
       </div>
 
-      <!-- 7日健康變化趨勢 (Chart.js) -->
+      <!-- 最近七次照護狀態表 -->
       <div class="bg-white rounded-2xl p-5 border border-slate-100 shadow-sm">
         <div class="flex justify-between items-center mb-4">
           <div>
-            <h3 class="font-bold text-slate-800 text-base">七日健康數位趨勢</h3>
-            <p class="text-[11px] text-slate-400">系統自動整合最近七次的照護週期事件</p>
+            <h3 class="font-bold text-slate-800 text-base">最近七次照護狀態</h3>
+            <p class="text-[11px] text-slate-400">用可愛圖示快速掌握每天的照護紀錄</p>
           </div>
-          <div class="flex space-x-2">
-            <span class="inline-flex items-center text-xs text-slate-500"><span class="w-2 h-2 rounded-full bg-blue-500 mr-1.5"></span>睡眠</span>
-            <span class="inline-flex items-center text-xs text-slate-500"><span class="w-2 h-2 rounded-full bg-pink-500 mr-1.5"></span>心情</span>
-          </div>
+          <span class="text-[10px] font-bold text-violet-600 bg-violet-50 px-2.5 py-1 rounded-full">每日一眼看懂</span>
         </div>
-        <div class="relative h-64 w-full">
-          <canvas id="careTrendChart"></canvas>
+        <div class="overflow-x-auto rounded-2xl border border-slate-100">
+          <table class="w-full min-w-[620px] text-center">
+            <thead class="bg-gradient-to-r from-sky-50 via-violet-50 to-rose-50 text-slate-600">
+              <tr class="text-xs font-bold">
+                <th class="px-3 py-3 text-left">日期</th>
+                <th class="px-3 py-3">😴<span class="block text-[10px] mt-1">睡眠</span></th>
+                <th class="px-3 py-3">🍚<span class="block text-[10px] mt-1">早餐</span></th>
+                <th class="px-3 py-3">😊<span class="block text-[10px] mt-1">心情</span></th>
+                <th class="px-3 py-3">💊<span class="block text-[10px] mt-1">吃藥</span></th>
+                <th class="px-3 py-3 text-left">照護小記</th>
+              </tr>
+            </thead>
+            <tbody id="care-status-table" class="divide-y divide-slate-100 bg-white text-sm"></tbody>
+          </table>
         </div>
       </div>
 
@@ -804,59 +813,40 @@ function parseMQTT(message) {
     // 7. Chart.js 健康趨勢圖渲染
     // ==========================================
     function renderChart(historyData) {
-      const ctx = document.getElementById('careTrendChart').getContext('2d');
-      const labels = historyData.map(d => {
-        const parts = d.date.split('/');
-        return parts.length >= 3 ? `${parts[1]}/${parts[2]}` : d.date;
-      });
-      const sleepData = historyData.map(d => d.sleep);
-      const moodData = historyData.map(d => d.mood);
+      const tableBody = document.getElementById('care-status-table');
+      const latestRecords = historyData.slice(-7);
+      const icon = (emoji, label, color) =>
+        `<span class="inline-flex items-center justify-center w-9 h-9 rounded-full ${color} text-lg" title="${label}" aria-label="${label}">${emoji}</span>`;
+      const dateLabel = (date) => {
+        const parts = String(date || '--').split('/');
+        return parts.length >= 3 ? `${parts[1]}/${parts[2]}` : String(date || '--');
+      };
+      const sleepIcon = (value) => value >= 5
+        ? icon('🌙', '睡眠良好', 'bg-sky-100')
+        : value >= 3 ? icon('😴', '睡眠普通', 'bg-slate-100') : icon('🥱', '睡眠欠佳', 'bg-rose-100');
+      const breakfastIcon = (value) => value === 1
+        ? icon('🍚', '已吃早餐', 'bg-amber-100') : icon('🥣', '尚未吃早餐', 'bg-slate-100');
+      const moodIcon = (value) => value >= 5
+        ? icon('😄', '心情愉快', 'bg-pink-100')
+        : value >= 3 ? icon('🙂', '心情平靜', 'bg-violet-100') : icon('😟', '心情需要關心', 'bg-rose-100');
+      const medicineIcon = (value) => value === 1
+        ? icon('✅', '已按時服藥', 'bg-emerald-100') : icon('⏰', '尚未服藥', 'bg-rose-100');
 
-      if (careChartInstance) {
-        careChartInstance.destroy();
+      if (latestRecords.length === 0) {
+        tableBody.innerHTML = '<tr><td colspan="6" class="py-8 text-slate-400">尚無照護紀錄</td></tr>';
+        return;
       }
 
-      careChartInstance = new Chart(ctx, {
-        type: 'bar',
-        data: {
-          labels: labels,
-          datasets: [
-            {
-              label: '昨晚睡眠品質指數 (1-5)',
-              data: sleepData,
-              borderColor: '#0ea5e9',
-              backgroundColor: 'rgba(14, 165, 233, 0.78)',
-              borderWidth: 1,
-              borderRadius: 6,
-              borderSkipped: false,
-              barPercentage: 0.72,
-              categoryPercentage: 0.7,
-            },
-            {
-              label: '今日情緒感受指數 (1-5)',
-              data: moodData,
-              borderColor: '#ec4899',
-              backgroundColor: 'rgba(236, 72, 153, 0.78)',
-              borderWidth: 1,
-              borderRadius: 6,
-              borderSkipped: false,
-              barPercentage: 0.72,
-              categoryPercentage: 0.7,
-            }
-          ]
-        },
-        options: {
-          responsive: true,
-          maintainAspectRatio: false,
-          plugins: {
-            legend: { display: false }
-          },
-          scales: {
-            y: { min: 0, max: 5, ticks: { stepSize: 1, font: { size: 10 } }, grid: { color: '#f1f5f9' } },
-            x: { ticks: { font: { size: 10 } }, grid: { display: false } }
-          }
-        }
-      });
+      tableBody.innerHTML = latestRecords.map((record, index) => `
+        <tr class="${index % 2 === 0 ? 'bg-white' : 'bg-slate-50/60'} hover:bg-violet-50/50 transition-colors">
+          <td class="px-3 py-3 text-left font-bold text-slate-600 whitespace-nowrap">${dateLabel(record.date)}<span class="block text-[10px] font-normal text-slate-400">${record.time || ''}</span></td>
+          <td class="px-3 py-3">${sleepIcon(Number(record.sleep))}</td>
+          <td class="px-3 py-3">${breakfastIcon(Number(record.breakfast))}</td>
+          <td class="px-3 py-3">${moodIcon(Number(record.mood))}</td>
+          <td class="px-3 py-3">${medicineIcon(Number(record.medicine))}</td>
+          <td class="px-3 py-3 text-left text-xs text-slate-500 whitespace-nowrap">${record.source || 'Kebbi Care'}</td>
+        </tr>
+      `).join('');
     }
 
     // ==========================================
