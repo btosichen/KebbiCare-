@@ -228,6 +228,26 @@
 
       </div>
 
+      <!-- 環境感測資料：由 MQTT 即時更新 -->
+      <div class="grid grid-cols-1 sm:grid-cols-2 gap-4">
+        <div class="bg-gradient-to-br from-cyan-50 to-sky-50 rounded-2xl p-4 border border-cyan-100 shadow-sm flex items-center gap-4">
+          <div class="w-14 h-14 rounded-2xl bg-cyan-500/15 text-cyan-600 flex items-center justify-center text-3xl" aria-hidden="true">💧</div>
+          <div class="min-w-0 flex-1">
+            <p class="text-xs font-bold text-cyan-700">室內濕度感測</p>
+            <p id="humidity-value" class="text-3xl font-black text-slate-800 mt-1">-- %</p>
+            <p class="text-[10px] text-slate-400 mt-1">MQTT 即時讀取・更新：<span id="humidity-time">無</span></p>
+          </div>
+        </div>
+        <div class="bg-gradient-to-br from-amber-50 to-yellow-50 rounded-2xl p-4 border border-amber-100 shadow-sm flex items-center gap-4">
+          <div class="w-14 h-14 rounded-2xl bg-amber-500/15 text-amber-600 flex items-center justify-center text-3xl" aria-hidden="true">☀️</div>
+          <div class="min-w-0 flex-1">
+            <p class="text-xs font-bold text-amber-700">室內亮度感測</p>
+            <p id="brightness-value" class="text-3xl font-black text-slate-800 mt-1">-- lux</p>
+            <p class="text-[10px] text-slate-400 mt-1">MQTT 即時讀取・更新：<span id="brightness-time">無</span></p>
+          </div>
+        </div>
+      </div>
+
       <!-- 最近七次照護狀態表 -->
       <div class="bg-white rounded-2xl p-5 border border-slate-100 shadow-sm">
         <div class="flex justify-between items-center mb-4">
@@ -489,6 +509,8 @@ let mqttClient=null;
       medicine: 1,
       elderId: "尚未辨識",
       indoorTemperature: null,
+      humidity: null,
+      brightness: null,
       summary: "系統正等待您輸入第一筆照護事件，將自動產出 AI 即時照護評估。",
       time: "--"
     };
@@ -536,6 +558,8 @@ let mqttClient=null;
             medicine: Math.random() > 0.15 ? 1 : 0,
             elderId: "尚未辨識",
             indoorTemperature: null,
+            humidity: null,
+            brightness: null,
             summary: "模擬歷史數據載入...",
             source: i === 0 ? "Web App" : "Kebbi (MQTT)"
           });
@@ -553,6 +577,8 @@ let mqttClient=null;
           medicine: last.medicine,
           elderId: last.elderId || "尚未辨識",
           indoorTemperature: last.indoorTemperature ?? null,
+          humidity: last.humidity ?? null,
+          brightness: last.brightness ?? null,
           summary: last.summary === "模擬歷史數據載入..." ? generateLocalSmartSummary(last) : last.summary,
           time: last.time
         };
@@ -577,6 +603,8 @@ let mqttClient=null;
               medicine: last.medicine,
               elderId: last.elderId || "尚未辨識",
               indoorTemperature: last.indoorTemperature ?? null,
+              humidity: last.humidity ?? null,
+              brightness: last.brightness ?? null,
               summary: last.summary,
               time: last.time
             };
@@ -624,6 +652,9 @@ let mqttClient=null;
       if (incomingPayload.elderId !== undefined) currentStatus.elderId = String(incomingPayload.elderId);
       if (incomingPayload.indoorTemperature !== undefined) currentStatus.indoorTemperature = Number(incomingPayload.indoorTemperature);
       if (incomingPayload.temperature !== undefined) currentStatus.indoorTemperature = Number(incomingPayload.temperature);
+      if (incomingPayload.humidity !== undefined) currentStatus.humidity = Number(incomingPayload.humidity);
+      if (incomingPayload.brightness !== undefined) currentStatus.brightness = Number(incomingPayload.brightness);
+      if (incomingPayload.lux !== undefined) currentStatus.brightness = Number(incomingPayload.lux);
       
       const now = new Date();
       currentStatus.time = now.toTimeString().split(' ')[0];
@@ -636,6 +667,8 @@ let mqttClient=null;
         medicine: currentStatus.medicine,
         elderId: currentStatus.elderId,
         indoorTemperature: currentStatus.indoorTemperature,
+        humidity: currentStatus.humidity,
+        brightness: currentStatus.brightness,
         summary: currentStatus.summary,
         source: incomingPayload.source || "Event Hub"
       };
@@ -724,6 +757,18 @@ let mqttClient=null;
       document.getElementById('indoor-temperature-value').innerText = Number.isFinite(currentStatus.indoorTemperature)
         ? `${currentStatus.indoorTemperature} °C`
         : '-- °C';
+      document.getElementById('humidity-value').innerText = Number.isFinite(currentStatus.humidity)
+        ? `${currentStatus.humidity} %`
+        : '-- %';
+      document.getElementById('humidity-time').innerText = Number.isFinite(currentStatus.humidity)
+        ? currentStatus.time
+        : '無';
+      document.getElementById('brightness-value').innerText = Number.isFinite(currentStatus.brightness)
+        ? `${currentStatus.brightness} lux`
+        : '-- lux';
+      document.getElementById('brightness-time').innerText = Number.isFinite(currentStatus.brightness)
+        ? currentStatus.time
+        : '無';
 
       document.getElementById('ai-today-summary').innerText = currentStatus.summary;
     }
@@ -785,13 +830,25 @@ function parseMQTT(message) {
       eventData.indoorTemperature = Number(data.temperature);
     }
 
+    if (data.humidity !== undefined) {
+      eventData.humidity = Number(data.humidity);
+    }
+
+    if (data.brightness !== undefined) {
+      eventData.brightness = Number(data.brightness);
+    } else if (data.lux !== undefined) {
+      eventData.brightness = Number(data.lux);
+    }
+
     const hasCareData =
       eventData.sleep !== undefined ||
       eventData.breakfast !== undefined ||
       eventData.mood !== undefined ||
       eventData.medicine !== undefined ||
       eventData.elderId !== undefined ||
-      eventData.indoorTemperature !== undefined;
+      eventData.indoorTemperature !== undefined ||
+      eventData.humidity !== undefined ||
+      eventData.brightness !== undefined;
 
     if (!hasCareData) {
       logConsole(
@@ -816,7 +873,7 @@ function parseMQTT(message) {
       const tableBody = document.getElementById('care-status-table');
       const latestRecords = historyData.slice(-7);
       const icon = (emoji, label, color) =>
-        `<span class="inline-flex items-center justify-center w-9 h-9 rounded-full ${color} text-lg" title="${label}" aria-label="${label}">${emoji}</span>`;
+        `<span class="inline-flex items-center justify-center w-[72px] h-[72px] rounded-full ${color} text-4xl" title="${label}" aria-label="${label}">${emoji}</span>`;
       const dateLabel = (date) => {
         const parts = String(date || '--').split('/');
         return parts.length >= 3 ? `${parts[1]}/${parts[2]}` : String(date || '--');
