@@ -414,26 +414,6 @@
         </div>
       </div>
 
-      <!-- Gemini AI 進階深度照護報告 -->
-      <div class="bg-gradient-to-br from-indigo-900 to-slate-900 rounded-2xl p-5 text-white shadow-lg relative overflow-hidden">
-        <div class="absolute -right-6 -bottom-6 w-24 h-24 bg-brand-500/10 rounded-full blur-xl"></div>
-        <h3 class="font-bold text-sm mb-1 flex items-center text-brand-300">
-          <span class="material-icons mr-1.5 text-base">auto_awesome</span>
-          Gemini 深度健康週報
-        </h3>
-        <p class="text-[11px] text-slate-300 mb-4">使用 AI 對長輩近期健康趨勢進行多維度分析並產出給家屬的報告。</p>
-        
-        <div class="space-y-3">
-          <div>
-            <label class="text-[9px] font-bold text-slate-400 block mb-1">GEMINI API KEY (選填 - 預設使用內建模擬摘要)</label>
-            <input type="password" id="gemini-key" placeholder="貼上 API 金鑰 (選填)" class="w-full bg-white/10 border border-white/20 rounded-xl px-3 py-1.5 text-xs text-white placeholder-white/30 focus:outline-none focus:ring-2 focus:ring-brand-400">
-          </div>
-          <button id="btn-generate-ai" onclick="generateAISummaryReport()" class="w-full bg-brand-500 hover:bg-brand-600 text-white text-xs font-bold py-2 px-4 rounded-xl transition-all duration-200 flex items-center justify-center shadow-lg shadow-brand-500/20">
-            <span class="material-icons text-sm mr-1.5">analytics</span> 一鍵產出 AI 家屬報告
-          </button>
-        </div>
-      </div>
-
     </section>
 
   </main>
@@ -1214,94 +1194,6 @@ function connectMQTT() {
     );
   });
 }
-    // ==========================================
-    // 10. 深度整合：Gemini 2.5 API 週報報告生成
-    // ==========================================
-    async function generateAISummaryReport() {
-      const btn = document.getElementById('btn-generate-ai');
-      const origText = btn.innerHTML;
-      const keyInput = document.getElementById('gemini-key').value.trim();
-      
-      btn.disabled = true;
-      btn.innerHTML = `<svg class="animate-spin -ml-1 mr-2 h-4 w-4 text-white inline-block" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24"><circle class="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" stroke-width="4"></circle><path class="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path></svg> AI 正在精算分析中...`;
-      logConsole("[Gemini AI] 正在收集最近七次健康趨勢快照...");
-
-      try {
-        const historyContext = localDB.slice(-7).map(d => ({
-          日期: d.date,
-          時間: d.time,
-          睡眠指數: d.sleep,
-          心情指數: d.mood,
-          早餐是否完成: d.breakfast === 1 ? '是' : '否',
-          服藥是否完成: d.medicine === 1 ? '是' : '否',
-          資料接收器: d.source
-        }));
-
-        const systemPrompt = "你是一位充滿熱忱、語調極其溫柔體貼的「高齡家庭照護數位分身 AI」。你的任務是閱讀最近的健康事件數據，為「家屬」撰寫一份精簡、溫暖、專業的照護總覽分析，字數約在150字內，著重於給家屬一兩個溫馨的小建議。";
-        const userQuery = `請分析以下長輩最近 7 次事件的照護週報數據：\n${JSON.stringify(historyContext, null, 2)}\n\n請以親切關懷的繁體中文口吻產出給家屬的報告。`;
-
-        if (keyInput === "") {
-          await new Promise(resolve => setTimeout(resolve, 1800));
-          
-          let avgSleep = (historyContext.reduce((acc, c) => acc + c.睡眠指數, 0) / historyContext.length).toFixed(1);
-          let avgMood = (historyContext.reduce((acc, c) => acc + c.心情指數, 0) / historyContext.length).toFixed(1);
-          let medComp = ((historyContext.filter(c => c.服藥是否完成 === '是').length / historyContext.length) * 100).toFixed(0);
-          
-          const simulatedResponse = `❤️ 【Gemini AI 數位分身週報報告】\n各位家屬您好！經分析長輩最近 7 次紀錄，睡眠指數平均落在良好的 ${avgSleep}/5 區間，心情則維持在平穩溫馨的 ${avgMood}/5。在智慧藥盒服藥遵循率上高達 ${medComp}%，表現極佳！近期長輩數位指標皆在安全範圍。建議週末多帶長輩到公園曬曬早晨太陽，能更有效延長夜晚深睡眠時間。`;
-          
-          document.getElementById('ai-today-summary').innerText = simulatedResponse;
-          currentStatus.summary = simulatedResponse;
-          logConsole("[Gemini AI] (模擬模式) 成功產出數位分身綜合健康週報報告。");
-        } else {
-          const url = `https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-flash-preview-09-2025:generateContent?key=${keyInput}`;
-          const payload = {
-            contents: [{ parts: [{ text: userQuery }] }],
-            systemInstruction: { parts: [{ text: systemPrompt }] }
-          };
-
-          let responseText = "";
-          let success = false;
-          let delay = 1000;
-
-          for (let attempt = 1; attempt <= 5; attempt++) {
-            try {
-              const response = await fetch(url, {
-                method: 'POST',
-                headers: { 'Content-Type': 'application/json' },
-                body: JSON.stringify(payload)
-              });
-              
-              if (response.ok) {
-                const result = await response.json();
-                responseText = result.candidates?.[0]?.content?.parts?.[0]?.text;
-                if (responseText) {
-                  success = true;
-                  break;
-                }
-              }
-            } catch (err) {}
-            if (!success) {
-              await new Promise(resolve => setTimeout(resolve, delay));
-              delay *= 2; 
-            }
-          }
-
-          if (success) {
-            document.getElementById('ai-today-summary').innerText = responseText;
-            currentStatus.summary = responseText;
-            logConsole("[Gemini AI] 實時雲端分析成功！照護摘要已更新。");
-          } else {
-            throw new Error("超過重試限制，無法取得 Gemini 回應。");
-          }
-        }
-      } catch (error) {
-        logConsole(`[Gemini AI 錯誤] 請求失敗: ${error.message}。`);
-        document.getElementById('ai-today-summary').innerText = `⚠️ 串接 API 時遇到錯誤：${error.message}。請確認您的 API 金鑰是否輸入正確、網路通暢。`;
-      } finally {
-        btn.disabled = false;
-        btn.innerHTML = origText;
-      }
-    }
   </script>
 </body>
 </html>
