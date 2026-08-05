@@ -242,7 +242,7 @@
           <div class="w-14 h-14 rounded-2xl bg-amber-500/15 text-amber-600 flex items-center justify-center text-3xl" aria-hidden="true">☀️</div>
           <div class="min-w-0 flex-1">
             <p class="text-xs font-bold text-amber-700">室內亮度感測</p>
-            <p id="brightness-value" class="text-3xl font-black text-slate-800 mt-1">-- lux</p>
+            <p id="brightness-value" class="text-3xl font-black text-slate-800 mt-1">-- %</p>
             <p class="text-[10px] text-slate-400 mt-1">MQTT 即時讀取・更新：<span id="brightness-time">無</span></p>
           </div>
         </div>
@@ -385,6 +385,18 @@
             <span class="text-xl" aria-hidden="true">💡</span><span>燈光詢問</span>
           </button>
         </div>
+        <div class="mt-4 pt-4 border-t border-rose-100">
+          <p class="text-[11px] font-bold text-slate-400 mb-2">🏠 ESP32 手動家電控制</p>
+          <div class="grid grid-cols-2 gap-2.5">
+            <button id="fan-control-button" type="button" onclick="toggleEsp32Device('fan')" class="bg-sky-50 hover:bg-sky-100 text-sky-700 text-xs font-bold py-3 px-2 rounded-2xl border border-sky-100 transition-all hover:-translate-y-0.5 flex flex-col items-center gap-1" aria-label="手動開啟或關閉風扇">
+              <span class="text-2xl" aria-hidden="true">🌀</span><span id="fan-control-label">開啟風扇</span>
+            </button>
+            <button id="led-control-button" type="button" onclick="toggleEsp32Device('led')" class="bg-amber-50 hover:bg-amber-100 text-amber-700 text-xs font-bold py-3 px-2 rounded-2xl border border-amber-100 transition-all hover:-translate-y-0.5 flex flex-col items-center gap-1" aria-label="手動開啟或關閉電燈">
+              <span class="text-2xl" aria-hidden="true">💡</span><span id="led-control-label">開啟電燈</span>
+            </button>
+          </div>
+          <p id="esp32-device-status" class="text-[10px] text-slate-400 text-center mt-2">等待 ESP32 裝置狀態…</p>
+        </div>
       </div>
 
       <!-- Live Event Console (日誌主控台) -->
@@ -494,6 +506,13 @@ const MQTT_BROKER = "wss://broker.emqx.io:8084/mqtt";
 const MQTT_TOPIC = "halocode";
 const MQTT_COMMAND_TOPIC = "halocode/kebbi/care/command";
 const MQTT_RESPONSE_TOPIC = "halocode/kebbi/care/response";
+// ESP32 小小氣運站：溫濕度、亮度與設備狀態 Topic。
+const ESP32_DHT_TOPIC = "ymlib/esp32/dht11/data";
+const ESP32_LIGHT_TOPIC = "ymlib/esp32/light/data";
+const ESP32_FAN_COMMAND_TOPIC = "ymlib/esp32/dht11/fan/set";
+const ESP32_FAN_STATE_TOPIC = "ymlib/esp32/dht11/fan/state";
+const ESP32_LED_COMMAND_TOPIC = "ymlib/esp32/led/set";
+const ESP32_LED_STATE_TOPIC = "ymlib/esp32/led/state";
 // GitHub Pages 透過此 GAS Web App 寫入 Google 試算表。
 const GAS_WEB_APP_URL = "https://script.google.com/macros/s/AKfycby_F3lF4RBSPhGb_6GhaUOBxxND2lHUHwri3JSUvG0Hh__KCAIZ6RIjm6i1ziyNL5MN/exec";
 let mqttClient=null;
@@ -511,6 +530,8 @@ let mqttClient=null;
       indoorTemperature: null,
       humidity: null,
       brightness: null,
+      fanOn: null,
+      ledOn: null,
       summary: "系統正等待您輸入第一筆照護事件，將自動產出 AI 即時照護評估。",
       time: "--"
     };
@@ -579,6 +600,8 @@ let mqttClient=null;
           indoorTemperature: last.indoorTemperature ?? null,
           humidity: last.humidity ?? null,
           brightness: last.brightness ?? null,
+          fanOn: currentStatus.fanOn,
+          ledOn: currentStatus.ledOn,
           summary: last.summary === "模擬歷史數據載入..." ? generateLocalSmartSummary(last) : last.summary,
           time: last.time
         };
@@ -605,6 +628,8 @@ let mqttClient=null;
               indoorTemperature: last.indoorTemperature ?? null,
               humidity: last.humidity ?? null,
               brightness: last.brightness ?? null,
+              fanOn: currentStatus.fanOn,
+              ledOn: currentStatus.ledOn,
               summary: last.summary,
               time: last.time
             };
@@ -764,11 +789,12 @@ let mqttClient=null;
         ? currentStatus.time
         : '無';
       document.getElementById('brightness-value').innerText = Number.isFinite(currentStatus.brightness)
-        ? `${currentStatus.brightness} lux`
-        : '-- lux';
+        ? `${currentStatus.brightness} %`
+        : '-- %';
       document.getElementById('brightness-time').innerText = Number.isFinite(currentStatus.brightness)
         ? currentStatus.time
         : '無';
+      updateEsp32DeviceControls();
 
       document.getElementById('ai-today-summary').innerText = currentStatus.summary;
     }
@@ -784,14 +810,49 @@ let mqttClient=null;
         element.className = "text-[10px] px-2 py-0.5 font-bold rounded-full bg-slate-50 text-slate-500";
       }
     }
-function parseMQTT(message) {
+
+    function updateEsp32DeviceControls() {
+      const fanLabel = document.getElementById('fan-control-label');
+      const ledLabel = document.getElementById('led-control-label');
+      const deviceStatus = document.getElementById('esp32-device-status');
+      if (!fanLabel || !ledLabel || !deviceStatus) return;
+
+      fanLabel.innerText = currentStatus.fanOn === true ? '關閉風扇' : '開啟風扇';
+      ledLabel.innerText = currentStatus.ledOn === true ? '關閉電燈' : '開啟電燈';
+      const fanText = currentStatus.fanOn === null ? '風扇狀態等待中' : (currentStatus.fanOn ? '風扇已開啟' : '風扇已關閉');
+      const ledText = currentStatus.ledOn === null ? '電燈狀態等待中' : (currentStatus.ledOn ? '電燈已開啟' : '電燈已關閉');
+      deviceStatus.innerText = `${fanText}・${ledText}`;
+    }
+
+    function toggleEsp32Device(device) {
+      if (!mqttClient || !mqttClient.connected) {
+        logConsole('[ESP32 Command] 無法送出：MQTT 尚未連線。');
+        return;
+      }
+      const isFan = device === 'fan';
+      const isOn = isFan ? currentStatus.fanOn : currentStatus.ledOn;
+      const topic = isFan ? ESP32_FAN_COMMAND_TOPIC : ESP32_LED_COMMAND_TOPIC;
+      const command = isOn === true ? 'OFF' : 'ON';
+      const deviceName = isFan ? '風扇' : '電燈';
+
+      mqttClient.publish(topic, command, { qos: 0 }, function(error) {
+        if (error) {
+          logConsole(`[ESP32 Command] ${deviceName}${command === 'ON' ? '開啟' : '關閉'}失敗：${error.message}`);
+          return;
+        }
+        document.getElementById('esp32-device-status').innerText = `已送出${deviceName}${command === 'ON' ? '開啟' : '關閉'}指令，等待 ESP32 回覆…`;
+        logConsole(`[ESP32 Command] 已送出 ${topic}：${command}`);
+      });
+    }
+
+function parseMQTT(message, defaultSource = "Kebbi MQTT") {
   const msg = String(message).trim();
 
   // 純數字：先作為睡眠分數測試
   if (msg === "1" || msg === "3" || msg === "5") {
     triggerEvent({
       sleep: Number(msg),
-      source: "Kebbi MQTT"
+      source: defaultSource
     });
 
     return;
@@ -801,7 +862,7 @@ function parseMQTT(message) {
   try {
     const data = JSON.parse(msg);
     const eventData = {
-      source: data.source || "Kebbi MQTT"
+      source: data.source || defaultSource
     };
 
     if (data.sleep !== undefined) {
@@ -1050,7 +1111,14 @@ function connectMQTT() {
       "relative inline-flex rounded-full h-2.5 w-2.5 bg-emerald-500";
 
     mqttClient.subscribe(
-      [MQTT_TOPIC, MQTT_RESPONSE_TOPIC],
+      [
+        MQTT_TOPIC,
+        MQTT_RESPONSE_TOPIC,
+        ESP32_DHT_TOPIC,
+        ESP32_LIGHT_TOPIC,
+        ESP32_FAN_STATE_TOPIC,
+        ESP32_LED_STATE_TOPIC
+      ],
       { qos: 0 },
       function (error) {
         if (error) {
@@ -1062,7 +1130,7 @@ function connectMQTT() {
         }
 
         logConsole(
-          "[MQTT] 已訂閱照護資料與凱比回覆 Topic。"
+          "[MQTT] 已訂閱照護、ESP32 感測與設備狀態 Topic。"
         );
       }
     );
@@ -1086,7 +1154,30 @@ function connectMQTT() {
       return;
     }
 
-    parseMQTT(message);
+    if (topic === ESP32_FAN_STATE_TOPIC || topic === ESP32_LED_STATE_TOPIC) {
+      const isOn = message.toUpperCase() === 'ON';
+      if (message.toUpperCase() !== 'ON' && message.toUpperCase() !== 'OFF') {
+        logConsole(`[ESP32 State] 無法辨識裝置狀態：${message}`);
+        return;
+      }
+      if (topic === ESP32_FAN_STATE_TOPIC) currentStatus.fanOn = isOn;
+      if (topic === ESP32_LED_STATE_TOPIC) currentStatus.ledOn = isOn;
+      updateEsp32DeviceControls();
+      logConsole(`[ESP32 State] ${topic === ESP32_FAN_STATE_TOPIC ? '風扇' : '電燈'}目前${isOn ? '開啟' : '關閉'}。`);
+      return;
+    }
+
+    if (topic === ESP32_DHT_TOPIC) {
+      parseMQTT(message, 'ESP32 DHT11 溫濕度感測器');
+      return;
+    }
+
+    if (topic === ESP32_LIGHT_TOPIC) {
+      parseMQTT(message, 'ESP32 亮度感測器');
+      return;
+    }
+
+    parseMQTT(message, 'Kebbi MQTT');
   });
 
   mqttClient.on("reconnect", function () {
