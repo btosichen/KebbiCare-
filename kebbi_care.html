@@ -494,9 +494,9 @@ const ESP32_FAN_STATE_TOPIC = "ymlib/esp32/dht11/fan/state";
 const ESP32_LED_COMMAND_TOPIC = "ymlib/esp32/led/set";
 const ESP32_LED_STATE_TOPIC = "ymlib/esp32/led/state";
 // 照護紀錄與環境感測資料分別寫入兩份 Google 試算表。
-const CARE_GAS_WEB_APP_URL = "https://script.google.com/macros/s/AKfycby_F3lF4RBSPhGb_6GhaUOBxxND2lHUHwri3JSUvG0Hh__KCAIZ6RIjm6i1ziyNL5MN/exec";
+const CARE_GAS_WEB_APP_URL = "https://script.google.com/macros/s/AKfycbyDyid6ZCNmXaobCvwUqhTFNgkgrdugsaioVCGQCty7nq2sb9NjJqv4hytbHlseXlwj/exec";
 // 建立「環境感測紀錄」試算表並部署第二個 GAS 後，將網址貼在雙引號中。
-const ENVIRONMENT_GAS_WEB_APP_URL = "";
+const ENVIRONMENT_GAS_WEB_APP_URL = "https://script.google.com/macros/s/AKfycbx4kxEphv8UCvSnCHEqZpHTfggbC6A92c92K08rmy6PyV4er4TRWd8YkzO96H78o4j9/exec";
 let mqttClient=null;
     let isGAS = typeof google !== 'undefined' && google.script && google.script.run;
     let localDB = [];
