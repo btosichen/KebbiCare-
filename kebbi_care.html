@@ -493,8 +493,10 @@ const ESP32_FAN_COMMAND_TOPIC = "ymlib/esp32/dht11/fan/set";
 const ESP32_FAN_STATE_TOPIC = "ymlib/esp32/dht11/fan/state";
 const ESP32_LED_COMMAND_TOPIC = "ymlib/esp32/led/set";
 const ESP32_LED_STATE_TOPIC = "ymlib/esp32/led/state";
-// GitHub Pages 透過此 GAS Web App 寫入 Google 試算表。
-const GAS_WEB_APP_URL = "https://script.google.com/macros/s/AKfycby_F3lF4RBSPhGb_6GhaUOBxxND2lHUHwri3JSUvG0Hh__KCAIZ6RIjm6i1ziyNL5MN/exec";
+// 照護紀錄與環境感測資料分別寫入兩份 Google 試算表。
+const CARE_GAS_WEB_APP_URL = "https://script.google.com/macros/s/AKfycby_F3lF4RBSPhGb_6GhaUOBxxND2lHUHwri3JSUvG0Hh__KCAIZ6RIjm6i1ziyNL5MN/exec";
+// 建立「環境感測紀錄」試算表並部署第二個 GAS 後，將網址貼在雙引號中。
+const ENVIRONMENT_GAS_WEB_APP_URL = "";
 let mqttClient=null;
     let isGAS = typeof google !== 'undefined' && google.script && google.script.run;
     let localDB = [];
@@ -510,6 +512,7 @@ let mqttClient=null;
       indoorTemperature: null,
       humidity: null,
       brightness: null,
+      environmentUpdatedAt: "--",
       fanOn: null,
       ledOn: null,
       summary: "系統正等待您輸入第一筆照護事件，將自動產出 AI 即時照護評估。",
@@ -580,6 +583,7 @@ let mqttClient=null;
           indoorTemperature: last.indoorTemperature ?? null,
           humidity: last.humidity ?? null,
           brightness: last.brightness ?? null,
+          environmentUpdatedAt: currentStatus.environmentUpdatedAt,
           fanOn: currentStatus.fanOn,
           ledOn: currentStatus.ledOn,
           summary: last.summary === "模擬歷史數據載入..." ? generateLocalSmartSummary(last) : last.summary,
@@ -608,6 +612,7 @@ let mqttClient=null;
               indoorTemperature: last.indoorTemperature ?? null,
               humidity: last.humidity ?? null,
               brightness: last.brightness ?? null,
+              environmentUpdatedAt: currentStatus.environmentUpdatedAt,
               fanOn: currentStatus.fanOn,
               ledOn: currentStatus.ledOn,
               summary: last.summary,
@@ -629,19 +634,31 @@ let mqttClient=null;
     }
 
     // GitHub Pages 無法使用 google.script.run；改以 GAS doPost() 寫入試算表。
-    async function saveRecordToGAS(record) {
+    async function postToGAS(url, record, label) {
+      if (!url) {
+        logConsole(`[${label}] 尚未設定 GAS Web App 網址，資料僅顯示在網頁。`);
+        return;
+      }
       try {
-        await fetch(GAS_WEB_APP_URL, {
+        await fetch(url, {
           method: 'POST',
           // Apps Script Web App 是跨網域端點；no-cors 讓公開 Web App 可接收請求。
           mode: 'no-cors',
           headers: { 'Content-Type': 'text/plain;charset=utf-8' },
           body: JSON.stringify(record)
         });
-        logConsole('[GAS API] 已送出試算表寫入請求。');
+        logConsole(`[${label}] 已送出試算表寫入請求。`);
       } catch (error) {
-        logConsole(`[GAS API 錯誤] 無法送出寫入請求：${error.message}`);
+        logConsole(`[${label} 錯誤] 無法送出寫入請求：${error.message}`);
       }
+    }
+
+    function saveRecordToGAS(record) {
+      return postToGAS(CARE_GAS_WEB_APP_URL, record, '照護 GAS');
+    }
+
+    function saveEnvironmentToGAS(record) {
+      return postToGAS(ENVIRONMENT_GAS_WEB_APP_URL, record, '環境 GAS');
     }
 
     // ==========================================
@@ -649,17 +666,31 @@ let mqttClient=null;
     // ==========================================
     function triggerEvent(incomingPayload) {
       logConsole(`[Event Received] 來源: ${incomingPayload.source} 接收到事件載荷: ${JSON.stringify(incomingPayload)}`);
+
+      const hasCareField =
+        incomingPayload.sleep !== undefined ||
+        incomingPayload.breakfast !== undefined ||
+        incomingPayload.mood !== undefined ||
+        incomingPayload.medicine !== undefined ||
+        incomingPayload.elderId !== undefined;
+      const hasEnvironmentField =
+        incomingPayload.indoorTemperature !== undefined ||
+        incomingPayload.temperature !== undefined ||
+        incomingPayload.humidity !== undefined ||
+        incomingPayload.brightness !== undefined ||
+        incomingPayload.lux !== undefined;
+
+      // ESP32 感測資料不建立照護紀錄，改寫入獨立的環境感測試算表。
+      if (!hasCareField && hasEnvironmentField) {
+        recordEnvironmentEvent(incomingPayload);
+        return;
+      }
       
       if (incomingPayload.sleep !== undefined) currentStatus.sleep = incomingPayload.sleep;
       if (incomingPayload.breakfast !== undefined) currentStatus.breakfast = incomingPayload.breakfast;
       if (incomingPayload.mood !== undefined) currentStatus.mood = incomingPayload.mood;
       if (incomingPayload.medicine !== undefined) currentStatus.medicine = incomingPayload.medicine;
       if (incomingPayload.elderId !== undefined) currentStatus.elderId = String(incomingPayload.elderId);
-      if (incomingPayload.indoorTemperature !== undefined) currentStatus.indoorTemperature = Number(incomingPayload.indoorTemperature);
-      if (incomingPayload.temperature !== undefined) currentStatus.indoorTemperature = Number(incomingPayload.temperature);
-      if (incomingPayload.humidity !== undefined) currentStatus.humidity = Number(incomingPayload.humidity);
-      if (incomingPayload.brightness !== undefined) currentStatus.brightness = Number(incomingPayload.brightness);
-      if (incomingPayload.lux !== undefined) currentStatus.brightness = Number(incomingPayload.lux);
       
       const now = new Date();
       currentStatus.time = now.toTimeString().split(' ')[0];
@@ -671,9 +702,6 @@ let mqttClient=null;
         mood: currentStatus.mood,
         medicine: currentStatus.medicine,
         elderId: currentStatus.elderId,
-        indoorTemperature: currentStatus.indoorTemperature,
-        humidity: currentStatus.humidity,
-        brightness: currentStatus.brightness,
         summary: currentStatus.summary,
         source: incomingPayload.source || "Event Hub"
       };
@@ -712,6 +740,27 @@ let mqttClient=null;
         updateUI();
         renderChart(localDB);
       }
+    }
+
+    function recordEnvironmentEvent(incomingPayload) {
+      if (incomingPayload.indoorTemperature !== undefined) currentStatus.indoorTemperature = Number(incomingPayload.indoorTemperature);
+      if (incomingPayload.temperature !== undefined) currentStatus.indoorTemperature = Number(incomingPayload.temperature);
+      if (incomingPayload.humidity !== undefined) currentStatus.humidity = Number(incomingPayload.humidity);
+      if (incomingPayload.brightness !== undefined) currentStatus.brightness = Number(incomingPayload.brightness);
+      if (incomingPayload.lux !== undefined) currentStatus.brightness = Number(incomingPayload.lux);
+
+      const now = new Date();
+      currentStatus.environmentUpdatedAt = now.toTimeString().split(' ')[0];
+      const environmentRecord = {
+        indoorTemperature: currentStatus.indoorTemperature,
+        humidity: currentStatus.humidity,
+        brightness: currentStatus.brightness,
+        source: incomingPayload.source || 'ESP32 環境感測器'
+      };
+
+      updateUI();
+      saveEnvironmentToGAS(environmentRecord);
+      logConsole('[Environment Event] 已更新網頁環境讀值並寫入獨立環境紀錄。');
     }
 
     // ==========================================
@@ -766,13 +815,13 @@ let mqttClient=null;
         ? `${currentStatus.humidity} %`
         : '-- %';
       document.getElementById('humidity-time').innerText = Number.isFinite(currentStatus.humidity)
-        ? currentStatus.time
+        ? (currentStatus.environmentUpdatedAt || '--')
         : '無';
       document.getElementById('brightness-value').innerText = Number.isFinite(currentStatus.brightness)
         ? `${currentStatus.brightness} %`
         : '-- %';
       document.getElementById('brightness-time').innerText = Number.isFinite(currentStatus.brightness)
-        ? currentStatus.time
+        ? (currentStatus.environmentUpdatedAt || '--')
         : '無';
       updateEsp32DeviceControls();
 
