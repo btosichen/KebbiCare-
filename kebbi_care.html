@@ -1,0 +1,1303 @@
+<!DOCTYPE html>
+<html lang="zh-TW">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Kebbi Care+ AI 家庭數位分身</title>
+  <!-- Tailwind CSS -->
+  <script src="https://unpkg.com/mqtt/dist/mqtt.min.js"></script>
+  <script src="https://cdn.tailwindcss.com"></script>
+  <!-- Chart.js -->
+  <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+  <!-- Google Material Icons & Font Awesome -->
+  <link href="https://fonts.googleapis.com/icon?family=Material+Icons" rel="stylesheet">
+  <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
+  <script>
+    tailwind.config = {
+      theme: {
+        extend: {
+          colors: {
+            brand: {
+              50: '#f0f9ff',
+              100: '#e0f2fe',
+              200: '#bae6fd',
+              500: '#0ea5e9',
+              600: '#0284c7',
+            },
+            sage: {
+              50: '#f4fbf7',
+              100: '#e6f7ee',
+              500: '#10b981',
+            }
+          }
+        }
+      }
+    }
+  </script>
+  <style>
+    @import url('https://fonts.googleapis.com/css2?family=Noto+Sans+TC:wght@300;400;500;700;900&display=swap');
+    body {
+      font-family: 'Noto Sans TC', sans-serif;
+      background-color: #f8fafc;
+    }
+    .custom-scrollbar::-webkit-scrollbar {
+      width: 6px;
+    }
+    .custom-scrollbar::-webkit-scrollbar-track {
+      background: #f1f5f9;
+    }
+    .custom-scrollbar::-webkit-scrollbar-thumb {
+      background: #cbd5e1;
+      border-radius: 3px;
+    }
+    .pulse-green {
+      animation: pulse 2s cubic-bezier(0.4, 0, 0.6, 1) infinite;
+    }
+    @keyframes pulse {
+      0%, 100% { opacity: 1; transform: scale(1); }
+      50% { opacity: .7; transform: scale(0.95); }
+    }
+  </style>
+</head>
+<body class="min-h-screen text-slate-800 flex flex-col justify-between">
+
+  <!-- 頂部導航列 -->
+  <header class="bg-white border-b border-slate-100 sticky top-0 z-40 shadow-sm backdrop-blur-md bg-white/90">
+    <div class="max-w-7xl mx-auto px-4 py-3.5 flex justify-between items-center">
+      <div class="flex items-center space-x-3">
+        <div class="bg-red-50 text-red-500 p-2.5 rounded-2xl flex items-center justify-center shadow-inner">
+          <span class="material-icons text-2xl animate-bounce">favorite</span>
+        </div>
+        <div>
+          <h1 class="text-xl font-bold tracking-tight text-slate-800 flex items-center">
+            Kebbi Care<span class="text-red-500 font-black ml-0.5">+</span>
+          </h1>
+          <p class="text-[11px] text-slate-400 font-medium tracking-wider uppercase">AI 家庭數位分身系統</p>
+        </div>
+      </div>
+      
+      <!-- 連線狀態指示燈 -->
+      <div class="flex items-center space-x-2 bg-slate-50 px-3 py-1.5 rounded-full border border-slate-100">
+        <span class="relative flex h-2.5 w-2.5">
+          <span class="animate-ping absolute inline-flex h-full w-full rounded-full bg-emerald-400 opacity-75"></span>
+          <span id="connection-dot" class="relative inline-flex rounded-full h-2.5 w-2.5 bg-emerald-500"></span>
+        </span>
+        <span id="connection-status" class="text-xs font-semibold text-slate-600 hidden sm:inline-block">Event Hub 運作中</span>
+      </div>
+    </div>
+  </header>
+
+  <!-- 主要內容區 -->
+  <main class="max-w-7xl mx-auto px-4 py-6 w-full flex-grow grid grid-cols-1 lg:grid-cols-12 gap-6">
+    
+    <!-- 左側與中央：主要儀表板 (8行寬) -->
+    <section class="lg:col-span-8 flex flex-col space-y-6">
+      
+      <!-- 溫暖引言與AI即時摘要 (加上外部連結區塊) -->
+      <div class="bg-gradient-to-r from-brand-100 via-brand-50 to-sage-50 rounded-3xl p-6 border border-brand-200/50 shadow-sm relative overflow-hidden">
+        <div class="absolute -right-10 -bottom-10 w-40 h-40 bg-white/20 rounded-full blur-2xl"></div>
+        
+        <!-- ================= 新增：可愛的外部連結按鈕 ================= -->
+        <div class="absolute top-4 right-4 flex flex-col sm:flex-row gap-2 z-20">
+          <a href="https://docs.google.com/spreadsheets/d/1mh6qGH9pg8mH6Uc9TX5NfvhJh6MUZYQyNaGy6hBh2MI/edit?usp=sharing" target="_blank" 
+             class="flex items-center space-x-1.5 bg-white/80 hover:bg-white backdrop-blur-md px-3 py-2 rounded-2xl shadow-sm text-green-700 transition-all duration-300 hover:-translate-y-1 hover:shadow-md border border-green-100 group">
+            <!-- 採用可愛的 Sheets logo -->
+            <img src="https://img.icons8.com/color/48/google-sheets.png" class="w-5 h-5 group-hover:scale-110 transition-transform" alt="Google Sheets">
+            <span class="text-xs font-bold tracking-wide">Care+</span>
+          </a>
+          <a href="https://docs.google.com/spreadsheets/d/11aPQk5MfuTyRlYXP7OS9mEtfd47G2E9QxVszP4DnJR4/edit?usp=sharing" target="_blank"
+             class="flex items-center space-x-1.5 bg-white/80 hover:bg-white backdrop-blur-md px-3 py-2 rounded-2xl shadow-sm text-cyan-700 transition-all duration-300 hover:-translate-y-1 hover:shadow-md border border-cyan-100 group">
+            <img src="https://img.icons8.com/fluency/48/thermometer.png" class="w-5 h-5 group-hover:scale-110 transition-transform" alt="Environment Google Sheets">
+            <span class="text-xs font-bold tracking-wide">Environment</span>
+          </a>
+          <a href="https://script.google.com/macros/s/AKfycbyx1gOGLwJNn325S-YZQOlUyYcbGt3uIr8jOZE6YFYb-erqFQ5QF2dxfloosF-TOpBK/exec" target="_blank" 
+             class="flex items-center space-x-1.5 bg-white/80 hover:bg-white backdrop-blur-md px-3 py-2 rounded-2xl shadow-sm text-blue-700 transition-all duration-300 hover:-translate-y-1 hover:shadow-md border border-blue-100 group">
+            <!-- 採用可愛的網頁 logo -->
+            <img src="https://img.icons8.com/fluency/48/domain.png" class="w-5 h-5 group-hover:scale-110 transition-transform" alt="Web App">
+            <span class="text-xs font-bold tracking-wide">正式版 Web</span>
+          </a>
+        </div>
+        <!-- ======================================================== -->
+
+        <div class="relative z-10 mt-16 sm:mt-0">
+          <span class="inline-block bg-brand-500 text-white text-[10px] font-bold px-2.5 py-1 rounded-full uppercase tracking-wider mb-3">AI Daily Insights</span>
+          <h2 class="text-2xl font-bold text-slate-800 mb-1">今日照護總覽</h2>
+          <p class="text-slate-500 text-sm mb-4">讓 AI 陪伴家人，把最溫暖、即時的關心帶回家</p>
+
+          <!-- 多人照護與環境感測預留欄位 -->
+          <div class="grid grid-cols-1 sm:grid-cols-2 gap-3 mb-4">
+            <div class="bg-gradient-to-r from-violet-500 to-indigo-500 rounded-2xl p-3.5 text-white shadow-md flex items-center gap-3">
+              <div class="w-11 h-11 rounded-2xl bg-white/20 flex items-center justify-center text-2xl" aria-hidden="true">🪪</div>
+              <div class="min-w-0">
+                <p class="text-[10px] font-bold tracking-wider text-violet-100">照護對象編號・號碼牌辨識</p>
+                <p id="elder-id-value" class="text-lg font-black tracking-wide truncate">尚未辨識</p>
+              </div>
+            </div>
+            <div class="bg-gradient-to-r from-orange-400 to-amber-400 rounded-2xl p-3.5 text-white shadow-md flex items-center gap-3">
+              <div class="w-11 h-11 rounded-2xl bg-white/20 flex items-center justify-center text-2xl" aria-hidden="true">🌡️</div>
+              <div class="min-w-0">
+                <p class="text-[10px] font-bold tracking-wider text-amber-50">室內溫度・環境感測預留</p>
+                <p id="indoor-temperature-value" class="text-lg font-black tracking-wide">-- °C</p>
+              </div>
+            </div>
+          </div>
+          
+          <div class="bg-white/80 backdrop-blur-sm p-4.5 rounded-2xl border border-white/60 shadow-inner flex items-start space-x-3">
+            <div class="bg-amber-100 text-amber-600 p-2 rounded-xl mt-0.5">
+              <span class="material-icons text-lg">auto_awesome</span>
+            </div>
+            <div>
+              <p class="text-xs text-slate-400 font-semibold mb-1">AI 照護數位分身今日回報：</p>
+              <p id="ai-today-summary" class="text-slate-700 font-medium leading-relaxed text-sm">
+                載入中...請嘗試觸發下方事件按鈕以更新數據。
+              </p>
+            </div>
+          </div>
+        </div>
+      </div>
+
+      <!-- 四張核心照護資訊卡 -->
+      <div class="grid grid-cols-2 md:grid-cols-4 gap-4">
+        
+        <!-- 睡眠卡 -->
+        <div class="bg-white rounded-2xl p-4 border border-slate-100 shadow-sm transition-all duration-300 hover:shadow-md hover:-translate-y-0.5 flex flex-col justify-between h-[165px] relative overflow-hidden group">
+          <div class="absolute top-0 right-0 w-16 h-16 bg-blue-50 rounded-full -mr-4 -mt-4 transition-transform group-hover:scale-110"></div>
+          <div class="flex justify-between items-start relative z-10">
+            <div class="p-2 bg-blue-500/10 text-blue-600 rounded-xl">
+              <span class="material-icons text-xl">nights_stay</span>
+            </div>
+            <span id="sleep-badge" class="text-[10px] px-2 py-0.5 font-bold rounded-full bg-slate-100 text-slate-500">--</span>
+          </div>
+          <div class="mt-4">
+            <p class="text-xs text-slate-400 font-medium">😴 昨晚睡眠</p>
+            <h3 id="sleep-value" class="text-2xl font-black text-slate-800 mt-1">--</h3>
+          </div>
+          <p class="text-[10px] text-slate-400 mt-2 flex items-center justify-between border-t border-slate-50 pt-2">
+            <span>更新：<span id="sleep-time">無</span></span>
+          </p>
+        </div>
+
+        <!-- 早餐卡 -->
+        <div class="bg-white rounded-2xl p-4 border border-slate-100 shadow-sm transition-all duration-300 hover:shadow-md hover:-translate-y-0.5 flex flex-col justify-between h-[165px] relative overflow-hidden group">
+          <div class="absolute top-0 right-0 w-16 h-16 bg-amber-50 rounded-full -mr-4 -mt-4 transition-transform group-hover:scale-110"></div>
+          <div class="flex justify-between items-start relative z-10">
+            <div class="p-2 bg-amber-500/10 text-amber-600 rounded-xl">
+              <span class="material-icons text-xl">restaurant</span>
+            </div>
+            <span id="breakfast-badge" class="text-[10px] px-2 py-0.5 font-bold rounded-full bg-slate-100 text-slate-500">--</span>
+          </div>
+          <div class="mt-4">
+            <p class="text-xs text-slate-400 font-medium">🍚 早餐攝取</p>
+            <h3 id="breakfast-value" class="text-2xl font-black text-slate-800 mt-1">--</h3>
+          </div>
+          <p class="text-[10px] text-slate-400 mt-2 flex items-center justify-between border-t border-slate-50 pt-2">
+            <span>更新：<span id="breakfast-time">無</span></span>
+          </p>
+        </div>
+
+        <!-- 心情卡 -->
+        <div class="bg-white rounded-2xl p-4 border border-slate-100 shadow-sm transition-all duration-300 hover:shadow-md hover:-translate-y-0.5 flex flex-col justify-between h-[165px] relative overflow-hidden group">
+          <div class="absolute top-0 right-0 w-16 h-16 bg-pink-50 rounded-full -mr-4 -mt-4 transition-transform group-hover:scale-110"></div>
+          <div class="flex justify-between items-start relative z-10">
+            <div class="p-2 bg-pink-500/10 text-pink-600 rounded-xl">
+              <span class="material-icons text-xl">sentiment_satisfied_alt</span>
+            </div>
+            <span id="mood-badge" class="text-[10px] px-2 py-0.5 font-bold rounded-full bg-slate-100 text-slate-500">--</span>
+          </div>
+          <div class="mt-4">
+            <p class="text-xs text-slate-400 font-medium">😊 今日心情</p>
+            <h3 id="mood-value" class="text-2xl font-black text-slate-800 mt-1">--</h3>
+          </div>
+          <p class="text-[10px] text-slate-400 mt-2 flex items-center justify-between border-t border-slate-50 pt-2">
+            <span>更新：<span id="mood-time">無</span></span>
+          </p>
+        </div>
+
+        <!-- 吃藥卡 -->
+        <div class="bg-white rounded-2xl p-4 border border-slate-100 shadow-sm transition-all duration-300 hover:shadow-md hover:-translate-y-0.5 flex flex-col justify-between h-[165px] relative overflow-hidden group">
+          <div class="absolute top-0 right-0 w-16 h-16 bg-emerald-50 rounded-full -mr-4 -mt-4 transition-transform group-hover:scale-110"></div>
+          <div class="flex justify-between items-start relative z-10">
+            <div class="p-2 bg-emerald-500/10 text-emerald-600 rounded-xl">
+              <span class="material-icons text-xl">vaccines</span>
+            </div>
+            <span id="medicine-badge" class="text-[10px] px-2 py-0.5 font-bold rounded-full bg-slate-100 text-slate-500">--</span>
+          </div>
+          <div class="mt-4">
+            <p class="text-xs text-slate-400 font-medium">💊 服藥紀錄</p>
+            <h3 id="medicine-value" class="text-2xl font-black text-slate-800 mt-1">--</h3>
+          </div>
+          <p class="text-[10px] text-slate-400 mt-2 flex items-center justify-between border-t border-slate-50 pt-2">
+            <span>更新：<span id="medicine-time">無</span></span>
+          </p>
+        </div>
+
+      </div>
+
+      <!-- 環境感測資料：由 MQTT 即時更新 -->
+      <div class="grid grid-cols-1 sm:grid-cols-2 gap-4">
+        <div class="bg-gradient-to-br from-cyan-50 to-sky-50 rounded-2xl p-4 border border-cyan-100 shadow-sm flex items-center gap-4">
+          <div class="w-14 h-14 rounded-2xl bg-cyan-500/15 text-cyan-600 flex items-center justify-center text-3xl" aria-hidden="true">💧</div>
+          <div class="min-w-0 flex-1">
+            <p class="text-xs font-bold text-cyan-700">室內濕度感測</p>
+            <p id="humidity-value" class="text-3xl font-black text-slate-800 mt-1">-- %</p>
+            <p class="text-[10px] text-slate-400 mt-1">MQTT 即時讀取・更新：<span id="humidity-time">無</span></p>
+          </div>
+        </div>
+        <div class="bg-gradient-to-br from-amber-50 to-yellow-50 rounded-2xl p-4 border border-amber-100 shadow-sm flex items-center gap-4">
+          <div class="w-14 h-14 rounded-2xl bg-amber-500/15 text-amber-600 flex items-center justify-center text-3xl" aria-hidden="true">☀️</div>
+          <div class="min-w-0 flex-1">
+            <p class="text-xs font-bold text-amber-700">室內亮度感測</p>
+            <p id="brightness-value" class="text-3xl font-black text-slate-800 mt-1">-- %</p>
+            <p class="text-[10px] text-slate-400 mt-1">MQTT 即時讀取・更新：<span id="brightness-time">無</span></p>
+          </div>
+        </div>
+      </div>
+
+      <!-- 最近七次照護狀態表 -->
+      <div class="bg-white rounded-2xl p-5 border border-slate-100 shadow-sm">
+        <div class="flex justify-between items-center mb-4">
+          <div>
+            <h3 class="font-bold text-slate-800 text-base">最近七次照護狀態</h3>
+            <p class="text-[11px] text-slate-400">用可愛圖示快速掌握每天的照護紀錄</p>
+          </div>
+          <div class="flex items-center gap-2">
+            <span class="text-[10px] font-bold text-violet-600 bg-violet-50 px-2.5 py-1 rounded-full">每日一眼看懂</span>
+            <button id="clear-care-records-button" type="button" onclick="clearCareRecords()" class="inline-flex items-center gap-1 text-[10px] font-bold text-rose-600 bg-rose-50 hover:bg-rose-100 px-2.5 py-1.5 rounded-full border border-rose-100 transition-colors" aria-label="清除網頁與 Google 試算表的照護測試紀錄">
+              <span class="material-icons text-xs" aria-hidden="true">delete_sweep</span>清除測試紀錄
+            </button>
+          </div>
+        </div>
+        <div class="overflow-x-auto rounded-2xl border border-slate-100">
+          <table class="w-full min-w-[620px] text-center">
+            <thead class="bg-gradient-to-r from-sky-50 via-violet-50 to-rose-50 text-slate-600">
+              <tr class="text-xs font-bold">
+                <th class="px-3 py-3 text-left">日期</th>
+                <th class="px-3 py-3">😴<span class="block text-[10px] mt-1">睡眠</span></th>
+                <th class="px-3 py-3">🍚<span class="block text-[10px] mt-1">早餐</span></th>
+                <th class="px-3 py-3">😊<span class="block text-[10px] mt-1">心情</span></th>
+                <th class="px-3 py-3">💊<span class="block text-[10px] mt-1">吃藥</span></th>
+                <th class="px-3 py-3 text-left">照護小記</th>
+              </tr>
+            </thead>
+            <tbody id="care-status-table" class="divide-y divide-slate-100 bg-white text-sm"></tbody>
+          </table>
+        </div>
+      </div>
+
+    </section>
+
+    <!-- 右側：事件接收模擬、MQTT與開發控制台 (4行寬) -->
+    <section class="lg:col-span-4 flex flex-col space-y-6">
+
+      <!-- Event Hub 測試控制面板 -->
+      <div class="bg-white rounded-2xl p-5 border border-slate-100 shadow-sm">
+        <h3 class="font-bold text-slate-800 text-base mb-1 flex items-center">
+          <span class="material-icons text-brand-500 mr-1.5">hub</span>
+          Event Hub 接收模擬
+        </h3>
+        <p class="text-xs text-slate-400 mb-4">點擊下方模擬事件，不論來源均會發送至同一個 saveRecord 事件流</p>
+        
+        <!-- 睡眠事件組 -->
+        <div class="mb-4">
+          <label class="text-[11px] font-bold text-slate-400 uppercase tracking-wider block mb-2">😴 睡眠狀態事件模擬</label>
+          <div class="grid grid-cols-3 gap-2">
+            <button onclick="triggerEvent({sleep: 5, source: 'Kebbi (MQTT)'})" class="bg-blue-50 hover:bg-blue-100 text-blue-700 text-xs font-semibold py-2 px-1 rounded-xl border border-blue-200/50 transition-colors flex flex-col items-center">
+              <span>很好 (5)</span>
+            </button>
+            <button onclick="triggerEvent({sleep: 3, source: 'Kebbi (MQTT)'})" class="bg-slate-50 hover:bg-slate-100 text-slate-600 text-xs font-semibold py-2 px-1 rounded-xl border border-slate-200/50 transition-colors flex flex-col items-center">
+              <span>普通 (3)</span>
+            </button>
+            <button onclick="triggerEvent({sleep: 1, source: 'Kebbi (MQTT)'})" class="bg-rose-50 hover:bg-rose-100 text-rose-700 text-xs font-semibold py-2 px-1 rounded-xl border border-rose-200/50 transition-colors flex flex-col items-center">
+              <span>不好 (1)</span>
+            </button>
+          </div>
+        </div>
+
+        <!-- 早餐事件組 -->
+        <div class="mb-4">
+          <label class="text-[11px] font-bold text-slate-400 uppercase tracking-wider block mb-2">🍚 早餐用餐事件模擬</label>
+          <div class="grid grid-cols-2 gap-2">
+            <button onclick="triggerEvent({breakfast: 1, source: 'ESP32 餐桌感測器'})" class="bg-amber-50 hover:bg-amber-100 text-amber-700 text-xs font-semibold py-2 px-2 rounded-xl border border-amber-200/50 transition-colors flex flex-col items-center">
+              <span>已完整進食 (1)</span>
+            </button>
+            <button onclick="triggerEvent({breakfast: 0, source: 'ESP32 餐桌感測器'})" class="bg-slate-50 hover:bg-slate-100 text-slate-600 text-xs font-semibold py-2 px-2 rounded-xl border border-slate-200/50 transition-colors flex flex-col items-center">
+              <span>未用餐 (0)</span>
+            </button>
+          </div>
+        </div>
+
+        <!-- 心情事件組 -->
+        <div class="mb-4">
+          <label class="text-[11px] font-bold text-slate-400 uppercase tracking-wider block mb-2">😊 長輩今日心情模擬</label>
+          <div class="grid grid-cols-3 gap-2">
+            <button onclick="triggerEvent({mood: 5, source: 'Kebbi 表情識別'})" class="bg-pink-50 hover:bg-pink-100 text-pink-700 text-xs font-semibold py-2 px-1 rounded-xl border border-pink-200/50 transition-colors flex flex-col items-center">
+              <span>愉快 (5)</span>
+            </button>
+            <button onclick="triggerEvent({mood: 3, source: 'Kebbi 表情識別'})" class="bg-slate-50 hover:bg-slate-100 text-slate-600 text-xs font-semibold py-2 px-1 rounded-xl border border-slate-200/50 transition-colors flex flex-col items-center">
+              <span>平靜 (3)</span>
+            </button>
+            <button onclick="triggerEvent({mood: 1, source: 'Kebbi 表情識別'})" class="bg-amber-50 hover:bg-amber-100 text-amber-700 text-xs font-semibold py-2 px-1 rounded-xl border border-amber-200/50 transition-colors flex flex-col items-center">
+              <span>焦慮 (1)</span>
+            </button>
+          </div>
+        </div>
+
+        <!-- 服藥事件組 -->
+        <div class="mb-4">
+          <label class="text-[11px] font-bold text-slate-400 uppercase tracking-wider block mb-2">💊 智慧藥盒服藥模擬</label>
+          <div class="grid grid-cols-2 gap-2">
+            <button onclick="triggerEvent({medicine: 1, source: 'IoT 智慧藥盒'})" class="bg-emerald-50 hover:bg-emerald-100 text-emerald-700 text-xs font-semibold py-2 px-2 rounded-xl border border-emerald-200/50 transition-colors flex flex-col items-center">
+              <span>已按時服藥 (1)</span>
+            </button>
+            <button onclick="triggerEvent({medicine: 0, source: 'IoT 智慧藥盒'})" class="bg-rose-50 hover:bg-rose-100 text-rose-700 text-xs font-semibold py-2 px-2 rounded-xl border border-rose-200/50 transition-colors flex flex-col items-center">
+              <span>忘記服藥 (0)</span>
+            </button>
+          </div>
+        </div>
+
+        <!-- 自訂綜合事件 (開發測試) -->
+        <div class="border-t border-slate-100 pt-4 mt-2">
+          <button onclick="openCustomEventModal()" class="w-full bg-slate-900 hover:bg-slate-800 text-white text-xs font-semibold py-2.5 px-4 rounded-xl transition-colors flex items-center justify-center shadow-sm">
+            <span class="material-icons text-sm mr-1.5">tune</span> 自訂多載荷 Event 發送
+          </button>
+        </div>
+      </div>
+
+      <!-- 家人遠端控制凱比 -->
+      <div class="bg-gradient-to-br from-rose-50 via-white to-brand-50 rounded-2xl p-5 border border-rose-100 shadow-sm">
+        <div class="flex items-start justify-between gap-3 mb-2">
+          <div>
+            <h3 class="font-bold text-slate-800 text-base flex items-center">
+              <span class="material-icons text-rose-500 mr-1.5">smart_toy</span>
+              凱比暖心關懷遙控器
+            </h3>
+            <p class="text-xs text-slate-400 mt-1">家人一鍵請凱比主動關心；指令會經 MQTT 傳送到凱比。</p>
+          </div>
+          <span id="care-command-status" class="shrink-0 text-[10px] font-bold px-2 py-1 rounded-full bg-slate-100 text-slate-500">等待指令</span>
+        </div>
+        <div class="grid grid-cols-2 gap-2.5 mt-4">
+          <button type="button" onclick="sendCareCommand('auto')" class="col-span-2 bg-gradient-to-r from-rose-500 to-pink-500 hover:from-rose-600 hover:to-pink-600 text-white font-bold py-3 px-3 rounded-2xl shadow-sm transition-all hover:-translate-y-0.5 flex items-center justify-center gap-2" aria-label="請凱比依序進行四項照護詢問">
+            <span class="text-lg" aria-hidden="true">🤖💖</span><span>全自動暖心巡問</span>
+          </button>
+          <button type="button" onclick="sendCareCommand('sleep')" class="bg-blue-50 hover:bg-blue-100 text-blue-700 text-xs font-bold py-3 px-2 rounded-2xl border border-blue-100 transition-colors flex flex-col items-center gap-1" aria-label="請凱比詢問睡眠狀況">
+            <span class="text-xl" aria-hidden="true">😴</span><span>睡眠詢問</span>
+          </button>
+          <button type="button" onclick="sendCareCommand('breakfast')" class="bg-amber-50 hover:bg-amber-100 text-amber-700 text-xs font-bold py-3 px-2 rounded-2xl border border-amber-100 transition-colors flex flex-col items-center gap-1" aria-label="請凱比詢問早餐狀況">
+            <span class="text-xl" aria-hidden="true">🍳</span><span>早餐詢問</span>
+          </button>
+          <button type="button" onclick="sendCareCommand('mood')" class="bg-pink-50 hover:bg-pink-100 text-pink-700 text-xs font-bold py-3 px-2 rounded-2xl border border-pink-100 transition-colors flex flex-col items-center gap-1" aria-label="請凱比詢問心情">
+            <span class="text-xl" aria-hidden="true">😊</span><span>心情詢問</span>
+          </button>
+          <button type="button" onclick="sendCareCommand('medicine')" class="bg-emerald-50 hover:bg-emerald-100 text-emerald-700 text-xs font-bold py-3 px-2 rounded-2xl border border-emerald-100 transition-colors flex flex-col items-center gap-1" aria-label="請凱比詢問服藥狀況">
+            <span class="text-xl" aria-hidden="true">💊</span><span>吃藥詢問</span>
+          </button>
+          <button type="button" onclick="sendCareCommand('light')" class="col-span-2 bg-violet-50 hover:bg-violet-100 text-violet-700 text-xs font-bold py-3 px-2 rounded-2xl border border-violet-100 transition-colors flex items-center justify-center gap-2" aria-label="請凱比詢問是否需要開關燈">
+            <span class="text-xl" aria-hidden="true">💡</span><span>燈光詢問</span>
+          </button>
+        </div>
+        <div class="mt-4 pt-4 border-t border-rose-100">
+          <p class="text-[11px] font-bold text-slate-400 mb-2">🏠 ESP32 手動家電控制</p>
+          <div class="grid grid-cols-2 gap-2.5">
+            <button id="fan-control-button" type="button" onclick="toggleEsp32Device('fan')" class="bg-sky-50 hover:bg-sky-100 text-sky-700 text-xs font-bold py-3 px-2 rounded-2xl border border-sky-100 transition-all hover:-translate-y-0.5 flex flex-col items-center gap-1" aria-label="手動開啟或關閉風扇">
+              <span class="text-2xl" aria-hidden="true">🌀</span><span id="fan-control-label">開啟風扇</span>
+            </button>
+            <button id="led-control-button" type="button" onclick="toggleEsp32Device('led')" class="bg-amber-50 hover:bg-amber-100 text-amber-700 text-xs font-bold py-3 px-2 rounded-2xl border border-amber-100 transition-all hover:-translate-y-0.5 flex flex-col items-center gap-1" aria-label="手動開啟或關閉電燈">
+              <span class="text-2xl" aria-hidden="true">💡</span><span id="led-control-label">開啟電燈</span>
+            </button>
+          </div>
+          <p id="esp32-device-status" class="text-[10px] text-slate-400 text-center mt-2">等待 ESP32 裝置狀態…</p>
+        </div>
+      </div>
+
+      <!-- Live Event Console (日誌主控台) -->
+      <div class="bg-slate-900 rounded-2xl p-4 text-slate-200 shadow-md flex flex-col h-[280px]">
+        <div class="flex justify-between items-center mb-2 pb-2 border-b border-slate-800">
+          <span class="text-xs font-bold text-brand-400 flex items-center">
+            <span class="material-icons text-sm mr-1 animate-pulse text-red-500 animate-ping">radio_button_checked</span>
+            Event Hub Live Log
+          </span>
+          <button onclick="clearLogs()" class="text-[10px] text-slate-400 hover:text-slate-200 transition-colors">清除記錄</button>
+        </div>
+        <div id="event-logs" class="flex-grow overflow-y-auto text-[11px] font-mono space-y-1.5 custom-scrollbar">
+          <div class="text-slate-500">[System] Event Hub 終端已就緒...</div>
+          <div class="text-slate-500">[System] 雙模同步就緒：自動檢測本機與 GAS 雲端模式</div>
+        </div>
+      </div>
+
+    </section>
+
+  </main>
+
+  <!-- 底部版權 -->
+  <footer class="bg-white border-t border-slate-100 py-4 mt-8">
+    <div class="max-w-7xl mx-auto px-4 text-center text-xs text-slate-400">
+      <p>© 2026 Kebbi Care+ AI 家庭數位分身系統 | 高擴充性照護事件接收中心 (Event Hub)</p>
+    </div>
+  </footer>
+
+  <!-- 自訂事件 Modal -->
+  <div id="custom-event-modal" class="fixed inset-0 bg-slate-900/60 backdrop-blur-sm z-50 flex items-center justify-center opacity-0 pointer-events-none transition-opacity duration-300">
+    <div class="bg-white rounded-3xl p-6 max-w-md w-full mx-4 shadow-2xl border border-slate-100 transform scale-95 transition-transform duration-300">
+      <div class="flex justify-between items-center mb-4">
+        <h4 class="font-bold text-lg text-slate-800">自訂 Event Payload</h4>
+        <button onclick="closeCustomEventModal()" class="text-slate-400 hover:text-slate-600"><span class="material-icons">close</span></button>
+      </div>
+      
+      <div class="space-y-3.5 text-sm">
+        <div>
+          <label class="block text-xs font-semibold text-slate-500 mb-1">事件來源 (Source)</label>
+          <input id="custom-source" type="text" value="ESP32_SmartBed" class="w-full border border-slate-200 rounded-xl px-3 py-2 text-slate-700 focus:ring-2 focus:ring-brand-500 focus:outline-none">
+        </div>
+        <div class="grid grid-cols-2 gap-3">
+          <div>
+            <label class="block text-xs font-semibold text-slate-500 mb-1">睡眠 (1-5)</label>
+            <input id="custom-sleep" type="number" min="1" max="5" value="4" class="w-full border border-slate-200 rounded-xl px-3 py-2 text-slate-700 focus:ring-2 focus:ring-brand-500 focus:outline-none">
+          </div>
+          <div>
+            <label class="block text-xs font-semibold text-slate-500 mb-1">心情 (1-5)</label>
+            <input id="custom-mood" type="number" min="1" max="5" value="4" class="w-full border border-slate-200 rounded-xl px-3 py-2 text-slate-700 focus:ring-2 focus:ring-brand-500 focus:outline-none">
+          </div>
+        </div>
+        <div class="grid grid-cols-2 gap-3">
+          <div>
+            <label class="block text-xs font-semibold text-slate-500 mb-1">早餐食量 (0/1)</label>
+            <select id="custom-breakfast" class="w-full border border-slate-200 rounded-xl px-3 py-2 text-slate-700 focus:ring-2 focus:ring-brand-500 focus:outline-none">
+              <option value="1">已完整用餐 (1)</option>
+              <option value="0">未用餐 (0)</option>
+            </select>
+          </div>
+          <div>
+            <label class="block text-xs font-semibold text-slate-500 mb-1">服藥 (0/1)</label>
+            <select id="custom-medicine" class="w-full border border-slate-200 rounded-xl px-3 py-2 text-slate-700 focus:ring-2 focus:ring-brand-500 focus:outline-none">
+              <option value="1">已服藥 (1)</option>
+              <option value="0">未服藥 (0)</option>
+            </select>
+          </div>
+        </div>
+      </div>
+
+      <div class="mt-6 flex space-x-3">
+        <button onclick="closeCustomEventModal()" class="flex-1 border border-slate-200 hover:bg-slate-50 text-slate-500 font-semibold py-2.5 rounded-xl transition-colors">取消</button>
+        <button onclick="submitCustomEvent()" class="flex-1 bg-brand-500 hover:bg-brand-600 text-white font-semibold py-2.5 rounded-xl transition-colors">送出事件</button>
+      </div>
+    </div>
+  </div>
+
+  <!-- JS 控制核心與雙模運作邏輯 -->
+  <script>
+    // ==========================================
+    // 1. 全域變數與系統檢測
+    // ==========================================
+    //------------------------------------
+// MQTT
+//------------------------------------
+const MQTT_BROKER = "wss://broker.emqx.io:8084/mqtt";
+// 照護資料、遠端指令與凱比回覆分開使用，避免控制訊息被誤存成健康紀錄。
+const MQTT_TOPIC = "halocode";
+const MQTT_COMMAND_TOPIC = "halocode/kebbi/care/command";
+const MQTT_RESPONSE_TOPIC = "halocode/kebbi/care/response";
+// ESP32 小小氣運站：溫濕度、亮度與設備狀態 Topic。
+const ESP32_DHT_TOPIC = "ymlib/esp32/dht11/data";
+const ESP32_LIGHT_TOPIC = "ymlib/esp32/light/data";
+const ESP32_FAN_COMMAND_TOPIC = "ymlib/esp32/dht11/fan/set";
+const ESP32_FAN_STATE_TOPIC = "ymlib/esp32/dht11/fan/state";
+const ESP32_LED_COMMAND_TOPIC = "ymlib/esp32/led/set";
+const ESP32_LED_STATE_TOPIC = "ymlib/esp32/led/state";
+// 照護紀錄與環境感測資料分別寫入兩份 Google 試算表。
+const CARE_GAS_WEB_APP_URL = "https://script.google.com/macros/s/AKfycbyDyid6ZCNmXaobCvwUqhTFNgkgrdugsaioVCGQCty7nq2sb9NjJqv4hytbHlseXlwj/exec";
+// 建立「環境感測紀錄」試算表並部署第二個 GAS 後，將網址貼在雙引號中。
+const ENVIRONMENT_GAS_WEB_APP_URL = "https://script.google.com/macros/s/AKfycbx4kxEphv8UCvSnCHEqZpHTfggbC6A92c92K08rmy6PyV4er4TRWd8YkzO96H78o4j9/exec";
+let mqttClient=null;
+    let isGAS = typeof google !== 'undefined' && google.script && google.script.run;
+    let localDB = [];
+    let careChartInstance = null;
+
+    const CARE_FIELDS = ['sleep', 'breakfast', 'mood', 'medicine'];
+
+    // null 代表尚未收到該項回答，絕對不可當成 0。
+    let currentStatus = {
+      sleep: null,
+      breakfast: null,
+      mood: null,
+      medicine: null,
+      sleepTime: '無',
+      breakfastTime: '無',
+      moodTime: '無',
+      medicineTime: '無',
+      elderId: "尚未辨識",
+      indoorTemperature: null,
+      humidity: null,
+      brightness: null,
+      environmentUpdatedAt: "--",
+      fanOn: null,
+      ledOn: null,
+      summary: "系統正等待您輸入第一筆照護事件，將自動產出 AI 即時照護評估。",
+      time: "--"
+    };
+
+    function normalizeCareValue(field, value) {
+      if (value === undefined || value === null || value === '') return null;
+      const numberValue = Number(value);
+      const allowed = {
+        sleep: [1, 3, 5],
+        breakfast: [0, 1],
+        mood: [1, 3, 5],
+        medicine: [0, 1]
+      };
+      return Number.isFinite(numberValue) && allowed[field].includes(numberValue) ? numberValue : null;
+    }
+
+    function resetCareStatus() {
+      CARE_FIELDS.forEach(function(field) {
+        currentStatus[field] = null;
+        currentStatus[field + 'Time'] = '無';
+      });
+      currentStatus.summary = '系統正等待第一筆有效照護回答。';
+      currentStatus.time = '--';
+    }
+
+    function rebuildCurrentStatus(records) {
+      resetCareStatus();
+      for (let index = records.length - 1; index >= 0; index--) {
+        const record = records[index];
+        CARE_FIELDS.forEach(function(field) {
+          if (currentStatus[field] !== null) return;
+          const value = normalizeCareValue(field, record[field]);
+          if (value !== null) {
+            currentStatus[field] = value;
+            currentStatus[field + 'Time'] = record.time || '無';
+          }
+        });
+        if (currentStatus.summary.indexOf('等待') >= 0 && record.summary) currentStatus.summary = record.summary;
+        if (currentStatus.elderId === '尚未辨識' && record.elderId) currentStatus.elderId = record.elderId;
+      }
+    }
+
+    // ==========================================
+    // 2. 初始化流程
+    // ==========================================
+    window.onload = function() {
+      logConsole("[System] 系統初始化中...");
+      
+      if (isGAS) {
+        document.getElementById('connection-status').innerText = "雲端試算表模式";
+        document.getElementById('connection-dot').className = "relative inline-flex rounded-full h-2.5 w-2.5 bg-indigo-500";
+        logConsole("[System] 偵測到執行環境為 Google Web App，啟用試算表同步。");
+        fetchGASData();
+      } else {
+        document.getElementById('connection-status').innerText = "網頁即時接收模式";
+        document.getElementById('connection-dot').className = "relative inline-flex rounded-full h-2.5 w-2.5 bg-amber-500";
+        logConsole("[System] 執行在獨立瀏覽器環境，等待凱比送入真實照護資料。");
+        loadMockData();
+      }
+      connectMQTT();
+    };
+
+    // ==========================================
+    // 3. 資料載入與模擬邏輯 (GAS vs LocalStorage)
+    // ==========================================
+    function loadMockData() {
+      const stored = localStorage.getItem('kebbi_care_records');
+      if (stored) {
+        const parsedRecords = JSON.parse(stored);
+        localDB = parsedRecords.filter(record => record.summary !== "模擬歷史數據載入...");
+        if (localDB.length !== parsedRecords.length) {
+          localStorage.setItem('kebbi_care_records', JSON.stringify(localDB));
+        }
+        logConsole(`[Database] 成功載入 ${localDB.length} 筆歷史資料。`);
+      } else {
+        localDB = [];
+        logConsole("[Database] 尚無照護紀錄；不自動建立示範答案。");
+      }
+      
+      rebuildCurrentStatus(localDB);
+      updateUI();
+      renderChart(localDB);
+    }
+
+    function fetchGASData() {
+      logConsole("[GAS] 正在從雲端試算表獲取歷史資料...");
+      google.script.run
+        .withSuccessHandler(function(history) {
+          if (history && history.length > 0) {
+            logConsole(`[GAS] 獲取成功！共有 ${history.length} 筆歷史資料。`);
+            localDB = history;
+            
+            rebuildCurrentStatus(history);
+            
+            updateUI();
+            renderChart(history);
+          } else {
+            logConsole("[GAS] 目前尚無試算表數據，請發送首筆事件進行建立。");
+            loadMockData();
+          }
+        })
+        .withFailureHandler(function(err) {
+          logConsole(`[GAS] 獲取雲端資料失敗: ${err}。切換為離線模式。`);
+          loadMockData();
+        })
+        .getHistoryRecords();
+    }
+
+    // GitHub Pages 無法使用 google.script.run；改以 GAS doPost() 寫入試算表。
+    async function postToGAS(url, record, label) {
+      if (!url) {
+        logConsole(`[${label}] 尚未設定 GAS Web App 網址，資料僅顯示在網頁。`);
+        return;
+      }
+      try {
+        await fetch(url, {
+          method: 'POST',
+          // Apps Script Web App 是跨網域端點；no-cors 讓公開 Web App 可接收請求。
+          mode: 'no-cors',
+          headers: { 'Content-Type': 'text/plain;charset=utf-8' },
+          body: JSON.stringify(record)
+        });
+        logConsole(`[${label}] 已送出試算表寫入請求。`);
+      } catch (error) {
+        logConsole(`[${label} 錯誤] 無法送出寫入請求：${error.message}`);
+      }
+    }
+
+    function saveRecordToGAS(record) {
+      return postToGAS(CARE_GAS_WEB_APP_URL, record, '照護 GAS');
+    }
+
+    function saveEnvironmentToGAS(record) {
+      return postToGAS(ENVIRONMENT_GAS_WEB_APP_URL, record, '環境 GAS');
+    }
+
+    // ==========================================
+    // 4. 事件接收核心 (Event Hub Event Handler)
+    // ==========================================
+    function triggerEvent(incomingPayload) {
+      logConsole(`[Event Received] 來源: ${incomingPayload.source} 接收到事件載荷: ${JSON.stringify(incomingPayload)}`);
+
+      const observedValues = {};
+      CARE_FIELDS.forEach(function(field) {
+        const value = normalizeCareValue(field, incomingPayload[field]);
+        if (value !== null) observedValues[field] = value;
+      });
+      const hasEnvironmentField =
+        incomingPayload.indoorTemperature !== undefined ||
+        incomingPayload.temperature !== undefined ||
+        incomingPayload.humidity !== undefined ||
+        incomingPayload.brightness !== undefined ||
+        incomingPayload.lux !== undefined;
+
+      // ESP32 感測資料不建立照護紀錄，改寫入獨立的環境感測試算表。
+      if (Object.keys(observedValues).length === 0 && hasEnvironmentField) {
+        recordEnvironmentEvent(incomingPayload);
+        return;
+      }
+
+      if (incomingPayload.elderId !== undefined) currentStatus.elderId = String(incomingPayload.elderId);
+
+      if (Object.keys(observedValues).length === 0) {
+        updateUI();
+        logConsole('[Event Hub] 沒有有效照護回答，已略過且不寫入紀錄。');
+        return;
+      }
+      
+      const now = new Date();
+      currentStatus.time = now.toTimeString().split(' ')[0];
+      CARE_FIELDS.forEach(function(field) {
+        if (observedValues[field] === undefined) return;
+        currentStatus[field] = observedValues[field];
+        currentStatus[field + 'Time'] = currentStatus.time;
+      });
+      currentStatus.summary = generateLocalSmartSummary(observedValues);
+      
+      const finalRecord = {
+        ...observedValues,
+        elderId: currentStatus.elderId,
+        summary: currentStatus.summary,
+        source: incomingPayload.source || "Event Hub"
+      };
+      
+      logConsole(`[Event Hub] 事件正在派送並呼叫 saveRecord()...`);
+      
+      if (isGAS) {
+        google.script.run
+          .withSuccessHandler(function(res) {
+            if (res.success) {
+              logConsole(`[GAS 雲端] 同步完成！試算表已成功追加一列資料。`);
+              fetchGASData();
+            } else {
+              logConsole(`[GAS 雲端錯誤] 儲存失敗: ${res.message}`);
+            }
+          })
+          .withFailureHandler(function(err) {
+            logConsole(`[GAS 網路錯誤] 調用失敗: ${err}`);
+          })
+          .saveRecord(finalRecord);
+      } else {
+        const dateStr = now.toLocaleDateString('zh-TW', {year: 'numeric', month: '2-digit', day: '2-digit'});
+        const newRecord = {
+          date: dateStr,
+          time: currentStatus.time,
+          ...finalRecord
+        };
+        
+        localDB.push(newRecord);
+        if (localDB.length > 15) localDB.shift();
+        localStorage.setItem('kebbi_care_records', JSON.stringify(localDB));
+        
+        logConsole(`[Database 模擬] 已成功寫入一筆事件。當前資料庫筆數：${localDB.length}`);
+        saveRecordToGAS(finalRecord);
+        
+        updateUI();
+        renderChart(localDB);
+      }
+    }
+
+    function recordEnvironmentEvent(incomingPayload) {
+      if (incomingPayload.indoorTemperature !== undefined) currentStatus.indoorTemperature = Number(incomingPayload.indoorTemperature);
+      if (incomingPayload.temperature !== undefined) currentStatus.indoorTemperature = Number(incomingPayload.temperature);
+      if (incomingPayload.humidity !== undefined) currentStatus.humidity = Number(incomingPayload.humidity);
+      if (incomingPayload.brightness !== undefined) currentStatus.brightness = Number(incomingPayload.brightness);
+      if (incomingPayload.lux !== undefined) currentStatus.brightness = Number(incomingPayload.lux);
+
+      const now = new Date();
+      currentStatus.environmentUpdatedAt = now.toTimeString().split(' ')[0];
+      const environmentRecord = {
+        indoorTemperature: currentStatus.indoorTemperature,
+        humidity: currentStatus.humidity,
+        brightness: currentStatus.brightness,
+        source: incomingPayload.source || 'ESP32 環境感測器'
+      };
+
+      updateUI();
+      saveEnvironmentToGAS(environmentRecord);
+      logConsole('[Environment Event] 已更新網頁環境讀值並寫入獨立環境紀錄。');
+    }
+
+    // ==========================================
+    // 5. 智慧本地照護摘要翻譯器
+    // ==========================================
+    function generateLocalSmartSummary(state) {
+      const descriptions = [];
+      if (normalizeCareValue('sleep', state.sleep) !== null) {
+        descriptions.push(state.sleep === 5 ? '昨晚睡得很好' : (state.sleep === 3 ? '昨晚睡眠普通' : '昨晚睡得不太好'));
+      }
+      if (normalizeCareValue('breakfast', state.breakfast) !== null) {
+        descriptions.push(state.breakfast === 1 ? '早餐已吃' : '早餐還沒吃');
+      }
+      if (normalizeCareValue('mood', state.mood) !== null) {
+        descriptions.push(state.mood === 5 ? '心情開心' : (state.mood === 3 ? '心情平靜' : '心情不太好'));
+      }
+      if (normalizeCareValue('medicine', state.medicine) !== null) {
+        descriptions.push(state.medicine === 1 ? '已完成服藥' : '尚未服藥');
+      }
+      return descriptions.length
+        ? `【照護快報】本次收到：${descriptions.join('；')}。未詢問項目不列入本次紀錄。`
+        : '本次沒有收到有效回答，因此未建立照護紀錄。';
+    }
+
+    // ==========================================
+    // 6. UI 面板更新渲染
+    // ==========================================
+    function updateUI() {
+      const sleepText = currentStatus.sleep === null ? "尚未詢問" : (currentStatus.sleep === 5 ? "良好 (5)" : (currentStatus.sleep === 3 ? "普通 (3)" : "欠佳 (1)"));
+      document.getElementById('sleep-value').innerText = sleepText;
+      document.getElementById('sleep-time').innerText = currentStatus.sleepTime;
+      const sleepBadge = document.getElementById('sleep-badge');
+      sleepBadge.innerText = currentStatus.sleep === null ? '無資料' : `指數: ${currentStatus.sleep}`;
+      setCardStatusColor(sleepBadge, currentStatus.sleep === null ? 'slate' : (currentStatus.sleep >= 4 ? 'emerald' : (currentStatus.sleep >= 3 ? 'slate' : 'rose')));
+
+      const bfText = currentStatus.breakfast === null ? "尚未詢問" : (currentStatus.breakfast === 1 ? "已完成" : "未完成");
+      document.getElementById('breakfast-value').innerText = bfText;
+      document.getElementById('breakfast-time').innerText = currentStatus.breakfastTime;
+      const bfBadge = document.getElementById('breakfast-badge');
+      bfBadge.innerText = currentStatus.breakfast === null ? '無資料' : (currentStatus.breakfast === 1 ? "已進食" : "待用餐");
+      setCardStatusColor(bfBadge, currentStatus.breakfast === null ? 'slate' : (currentStatus.breakfast === 1 ? 'emerald' : 'amber'));
+
+      const moodText = currentStatus.mood === null ? "尚未詢問" : (currentStatus.mood === 5 ? "愉快 (5)" : (currentStatus.mood === 3 ? "平靜 (3)" : "不太好 (1)"));
+      document.getElementById('mood-value').innerText = moodText;
+      document.getElementById('mood-time').innerText = currentStatus.moodTime;
+      const moodBadge = document.getElementById('mood-badge');
+      moodBadge.innerText = currentStatus.mood === null ? '無資料' : `情緒: ${currentStatus.mood}`;
+      setCardStatusColor(moodBadge, currentStatus.mood === null ? 'slate' : (currentStatus.mood >= 4 ? 'emerald' : (currentStatus.mood >= 3 ? 'slate' : 'rose')));
+
+      const medText = currentStatus.medicine === null ? "尚未詢問" : (currentStatus.medicine === 1 ? "已按時服藥" : "尚未服藥");
+      document.getElementById('medicine-value').innerText = medText;
+      document.getElementById('medicine-time').innerText = currentStatus.medicineTime;
+      const medBadge = document.getElementById('medicine-badge');
+      medBadge.innerText = currentStatus.medicine === null ? '無資料' : (currentStatus.medicine === 1 ? "完成" : "待確認");
+      setCardStatusColor(medBadge, currentStatus.medicine === null ? 'slate' : (currentStatus.medicine === 1 ? 'emerald' : 'rose'));
+
+      document.getElementById('elder-id-value').innerText = currentStatus.elderId || '尚未辨識';
+      document.getElementById('indoor-temperature-value').innerText = Number.isFinite(currentStatus.indoorTemperature)
+        ? `${currentStatus.indoorTemperature} °C`
+        : '-- °C';
+      document.getElementById('humidity-value').innerText = Number.isFinite(currentStatus.humidity)
+        ? `${currentStatus.humidity} %`
+        : '-- %';
+      document.getElementById('humidity-time').innerText = Number.isFinite(currentStatus.humidity)
+        ? (currentStatus.environmentUpdatedAt || '--')
+        : '無';
+      document.getElementById('brightness-value').innerText = Number.isFinite(currentStatus.brightness)
+        ? `${currentStatus.brightness} %`
+        : '-- %';
+      document.getElementById('brightness-time').innerText = Number.isFinite(currentStatus.brightness)
+        ? (currentStatus.environmentUpdatedAt || '--')
+        : '無';
+      updateEsp32DeviceControls();
+
+      document.getElementById('ai-today-summary').innerText = currentStatus.summary;
+    }
+
+    function setCardStatusColor(element, type) {
+      if (type === 'emerald') {
+        element.className = "text-[10px] px-2 py-0.5 font-bold rounded-full bg-emerald-50 text-emerald-600 pulse-green";
+      } else if (type === 'amber') {
+        element.className = "text-[10px] px-2 py-0.5 font-bold rounded-full bg-amber-50 text-amber-600";
+      } else if (type === 'rose') {
+        element.className = "text-[10px] px-2 py-0.5 font-bold rounded-full bg-rose-50 text-rose-600 pulse-green";
+      } else {
+        element.className = "text-[10px] px-2 py-0.5 font-bold rounded-full bg-slate-50 text-slate-500";
+      }
+    }
+
+    function updateEsp32DeviceControls() {
+      const fanLabel = document.getElementById('fan-control-label');
+      const ledLabel = document.getElementById('led-control-label');
+      const deviceStatus = document.getElementById('esp32-device-status');
+      if (!fanLabel || !ledLabel || !deviceStatus) return;
+
+      fanLabel.innerText = currentStatus.fanOn === true ? '關閉風扇' : '開啟風扇';
+      ledLabel.innerText = currentStatus.ledOn === true ? '關閉電燈' : '開啟電燈';
+      const fanText = currentStatus.fanOn === null ? '風扇狀態等待中' : (currentStatus.fanOn ? '風扇已開啟' : '風扇已關閉');
+      const ledText = currentStatus.ledOn === null ? '電燈狀態等待中' : (currentStatus.ledOn ? '電燈已開啟' : '電燈已關閉');
+      deviceStatus.innerText = `${fanText}・${ledText}`;
+    }
+
+    function toggleEsp32Device(device) {
+      if (!mqttClient || !mqttClient.connected) {
+        logConsole('[ESP32 Command] 無法送出：MQTT 尚未連線。');
+        return;
+      }
+      const isFan = device === 'fan';
+      const isOn = isFan ? currentStatus.fanOn : currentStatus.ledOn;
+      const topic = isFan ? ESP32_FAN_COMMAND_TOPIC : ESP32_LED_COMMAND_TOPIC;
+      const command = isOn === true ? 'OFF' : 'ON';
+      const deviceName = isFan ? '風扇' : '電燈';
+
+      mqttClient.publish(topic, command, { qos: 0 }, function(error) {
+        if (error) {
+          logConsole(`[ESP32 Command] ${deviceName}${command === 'ON' ? '開啟' : '關閉'}失敗：${error.message}`);
+          return;
+        }
+        document.getElementById('esp32-device-status').innerText = `已送出${deviceName}${command === 'ON' ? '開啟' : '關閉'}指令，等待 ESP32 回覆…`;
+        logConsole(`[ESP32 Command] 已送出 ${topic}：${command}`);
+      });
+    }
+
+function parseMQTT(message, defaultSource = "Kebbi MQTT") {
+  const msg = String(message).trim();
+
+  // 純數字：先作為睡眠分數測試
+  if (msg === "1" || msg === "3" || msg === "5") {
+    triggerEvent({
+      sleep: Number(msg),
+      source: defaultSource
+    });
+
+    return;
+  }
+
+  // JSON 完整資料
+  try {
+    const data = JSON.parse(msg);
+    const eventData = {
+      source: data.source || defaultSource
+    };
+
+    CARE_FIELDS.forEach(function(field) {
+      const value = normalizeCareValue(field, data[field]);
+      if (value !== null) eventData[field] = value;
+    });
+
+    if (data.elderId !== undefined) {
+      eventData.elderId = String(data.elderId);
+    }
+
+    if (data.indoorTemperature !== undefined) {
+      eventData.indoorTemperature = Number(data.indoorTemperature);
+    } else if (data.temperature !== undefined) {
+      eventData.indoorTemperature = Number(data.temperature);
+    }
+
+    if (data.humidity !== undefined) {
+      eventData.humidity = Number(data.humidity);
+    }
+
+    if (data.brightness !== undefined) {
+      eventData.brightness = Number(data.brightness);
+    } else if (data.lux !== undefined) {
+      eventData.brightness = Number(data.lux);
+    }
+
+    const hasCareData =
+      eventData.sleep !== undefined ||
+      eventData.breakfast !== undefined ||
+      eventData.mood !== undefined ||
+      eventData.medicine !== undefined ||
+      eventData.elderId !== undefined ||
+      eventData.indoorTemperature !== undefined ||
+      eventData.humidity !== undefined ||
+      eventData.brightness !== undefined;
+
+    if (!hasCareData) {
+      logConsole(
+        "[MQTT] JSON 中沒有可辨識的照護欄位。"
+      );
+      return;
+    }
+
+    triggerEvent(eventData);
+
+  } catch (error) {
+    logConsole(
+      "[MQTT] 無法辨識訊息格式：" +
+      msg
+    );
+  }
+}
+    // ==========================================
+    // 7. Chart.js 健康趨勢圖渲染
+    // ==========================================
+    function renderChart(historyData) {
+      const tableBody = document.getElementById('care-status-table');
+      const latestRecords = historyData.slice(-7);
+      const icon = (emoji, label, color) =>
+        `<span class="inline-flex items-center justify-center w-[72px] h-[72px] rounded-full ${color} text-4xl" title="${label}" aria-label="${label}">${emoji}</span>`;
+      const noAnswer = '<span class="text-slate-300 text-2xl" title="本次未詢問" aria-label="本次未詢問">—</span>';
+      const dateLabel = (date) => {
+        const parts = String(date || '--').split('/');
+        return parts.length >= 3 ? `${parts[1]}/${parts[2]}` : String(date || '--');
+      };
+      const sleepIcon = (value) => value >= 5
+        ? icon('🌙', '睡眠良好', 'bg-sky-100')
+        : value >= 3 ? icon('😴', '睡眠普通', 'bg-slate-100') : icon('🥱', '睡眠欠佳', 'bg-rose-100');
+      const breakfastIcon = (value) => value === 1
+        ? icon('🍚', '已吃早餐', 'bg-amber-100') : icon('🥣', '尚未吃早餐', 'bg-slate-100');
+      const moodIcon = (value) => value >= 5
+        ? icon('😄', '心情愉快', 'bg-pink-100')
+        : value >= 3 ? icon('🙂', '心情平靜', 'bg-violet-100') : icon('😟', '心情需要關心', 'bg-rose-100');
+      const medicineIcon = (value) => value === 1
+        ? icon('✅', '已按時服藥', 'bg-emerald-100') : icon('⏰', '尚未服藥', 'bg-rose-100');
+      const careIcon = (field, value, renderer) => {
+        const normalized = normalizeCareValue(field, value);
+        return normalized === null ? noAnswer : renderer(normalized);
+      };
+
+      if (latestRecords.length === 0) {
+        tableBody.innerHTML = '<tr><td colspan="6" class="py-8 text-slate-400">尚無照護紀錄</td></tr>';
+        return;
+      }
+
+      tableBody.innerHTML = latestRecords.map((record, index) => `
+        <tr class="${index % 2 === 0 ? 'bg-white' : 'bg-slate-50/60'} hover:bg-violet-50/50 transition-colors">
+          <td class="px-3 py-3 text-left font-bold text-slate-600 whitespace-nowrap">${dateLabel(record.date)}<span class="block text-[10px] font-normal text-slate-400">${record.time || ''}</span></td>
+          <td class="px-3 py-3">${careIcon('sleep', record.sleep, sleepIcon)}</td>
+          <td class="px-3 py-3">${careIcon('breakfast', record.breakfast, breakfastIcon)}</td>
+          <td class="px-3 py-3">${careIcon('mood', record.mood, moodIcon)}</td>
+          <td class="px-3 py-3">${careIcon('medicine', record.medicine, medicineIcon)}</td>
+          <td class="px-3 py-3 text-left text-xs text-slate-500 whitespace-nowrap">${record.source || 'Kebbi Care'}</td>
+        </tr>
+      `).join('');
+    }
+
+    // ==========================================
+    // 8. 終端控制台 (Log Engine)
+    // ==========================================
+    function logConsole(message) {
+      const consoleEl = document.getElementById('event-logs');
+      const timeStr = new Date().toTimeString().split(' ')[0];
+      const newLog = document.createElement('div');
+      newLog.className = "hover:bg-slate-800 py-0.5 px-1 rounded transition-colors";
+      
+      if (message.includes("[Event Received]")) {
+        newLog.innerHTML = `<span class="text-emerald-400">[${timeStr}]</span> <span class="text-amber-300 font-bold">${message}</span>`;
+      } else if (message.includes("[GAS]")) {
+        newLog.innerHTML = `<span class="text-indigo-400">[${timeStr}]</span> <span class="text-indigo-300">${message}</span>`;
+      } else if (message.includes("[System]")) {
+        newLog.innerHTML = `<span class="text-slate-500">[${timeStr}]</span> <span class="text-slate-300">${message}</span>`;
+      } else {
+        newLog.innerHTML = `<span class="text-slate-500">[${timeStr}]</span> ${message}`;
+      }
+      
+      consoleEl.appendChild(newLog);
+      consoleEl.scrollTop = consoleEl.scrollHeight;
+    }
+
+function clearLogs() {
+      document.getElementById('event-logs').innerHTML = `<div class="text-slate-500">[System] 日誌主控台已清空。</div>`;
+    }
+
+    function clearLocalCareRecords() {
+      localDB = [];
+      localStorage.removeItem('kebbi_care_records');
+      resetCareStatus();
+      updateUI();
+      renderChart([]);
+    }
+
+    async function clearCareRecords() {
+      const confirmed = window.confirm('確定要清除所有照護測試紀錄嗎？\n\n這會清除網頁暫存與 Google 試算表 CareRecord 的資料列，但會保留欄位標題。');
+      if (!confirmed) return;
+
+      const button = document.getElementById('clear-care-records-button');
+      button.disabled = true;
+      button.classList.add('opacity-50', 'cursor-not-allowed');
+      clearLocalCareRecords();
+      logConsole('[Database] 網頁照護紀錄已清空。');
+
+      if (isGAS) {
+        google.script.run
+          .withSuccessHandler(function(result) {
+            logConsole(result && result.success
+              ? '[GAS] Google 試算表照護紀錄已清空。'
+              : `[GAS 錯誤] ${result?.message || '清除失敗'}`);
+            button.disabled = false;
+            button.classList.remove('opacity-50', 'cursor-not-allowed');
+          })
+          .withFailureHandler(function(error) {
+            logConsole(`[GAS 錯誤] 無法清除試算表：${error}`);
+            button.disabled = false;
+            button.classList.remove('opacity-50', 'cursor-not-allowed');
+          })
+          .clearCareRecords();
+        return;
+      }
+
+      await postToGAS(CARE_GAS_WEB_APP_URL, { operation: 'clearCareRecords' }, '照護 GAS 清除');
+      logConsole('[GAS] 已送出 Google 試算表清除請求。');
+      button.disabled = false;
+      button.classList.remove('opacity-50', 'cursor-not-allowed');
+    }
+
+    // ==========================================
+    // 9. 家人遠端遙控凱比（MQTT Command Publisher）
+    // ==========================================
+    const careCommandLabels = {
+      auto: '全自動暖心巡問',
+      sleep: '睡眠詢問',
+      breakfast: '早餐詢問',
+      mood: '心情詢問',
+      medicine: '吃藥詢問',
+      light: '燈光詢問'
+    };
+
+    function setCareCommandStatus(text, color = 'slate') {
+      const status = document.getElementById('care-command-status');
+      const colorClasses = {
+        slate: 'bg-slate-100 text-slate-500',
+        emerald: 'bg-emerald-50 text-emerald-600',
+        rose: 'bg-rose-50 text-rose-600',
+        brand: 'bg-brand-50 text-brand-600'
+      };
+      status.innerText = text;
+      status.className = `shrink-0 text-[10px] font-bold px-2 py-1 rounded-full ${colorClasses[color] || colorClasses.slate}`;
+    }
+
+    function sendCareCommand(action) {
+      if (!mqttClient || !mqttClient.connected) {
+        setCareCommandStatus('MQTT 尚未連線', 'rose');
+        logConsole('[MQTT Command] 無法送出：尚未連線到 Broker。');
+        return;
+      }
+
+      const command = {
+        type: 'care_command',
+        action: action,
+        requestedAt: new Date().toISOString(),
+        requestedBy: 'kebbi_care_web'
+      };
+
+      mqttClient.publish(MQTT_COMMAND_TOPIC, JSON.stringify(command), { qos: 1 }, function(error) {
+        if (error) {
+          setCareCommandStatus('傳送失敗', 'rose');
+          logConsole(`[MQTT Command] 傳送失敗：${error.message}`);
+          return;
+        }
+        setCareCommandStatus(`已請凱比：${careCommandLabels[action]}`, 'emerald');
+        logConsole(`[MQTT Command] 已傳送「${careCommandLabels[action]}」至 ${MQTT_COMMAND_TOPIC}`);
+      });
+    }
+
+    // ==========================================
+    // 9. 自訂事件 Modal 控制
+    // ==========================================
+    function openCustomEventModal() {
+      const modal = document.getElementById('custom-event-modal');
+      modal.classList.remove('opacity-0', 'pointer-events-none');
+      modal.querySelector('div').classList.remove('scale-95');
+      modal.querySelector('div').classList.add('scale-100');
+    }
+
+    function closeCustomEventModal() {
+      const modal = document.getElementById('custom-event-modal');
+      modal.classList.add('opacity-0', 'pointer-events-none');
+      modal.querySelector('div').classList.remove('scale-100');
+      modal.querySelector('div').classList.add('scale-95');
+    }
+
+    function submitCustomEvent() {
+      const source = document.getElementById('custom-source').value;
+      const sleep = parseInt(document.getElementById('custom-sleep').value);
+      const mood = parseInt(document.getElementById('custom-mood').value);
+      const breakfast = parseInt(document.getElementById('custom-breakfast').value);
+      const medicine = parseInt(document.getElementById('custom-medicine').value);
+      
+      triggerEvent({ source, sleep, mood, breakfast, medicine });
+      closeCustomEventModal();
+    }
+//mq
+    //------------------------------------
+// MQTT 接收
+//------------------------------------
+function connectMQTT() {
+  logConsole("[MQTT] 準備連線 Broker...");
+
+  if (typeof mqtt === "undefined") {
+    logConsole("[MQTT Error] MQTT.js 載入失敗。");
+    return;
+  }
+
+  if (mqttClient) {
+    try {
+      mqttClient.end(true);
+    } catch (error) {
+      console.warn(error);
+    }
+  }
+
+  mqttClient = mqtt.connect(MQTT_BROKER, {
+    clientId:
+      "kebbi_" +
+      Math.random().toString(16).substring(2, 10),
+
+    clean: true,
+    reconnectPeriod: 3000,
+    connectTimeout: 10000,
+    keepalive: 60
+  });
+
+  mqttClient.on("connect", function () {
+    logConsole("[MQTT] Broker 連線成功。");
+
+    document.getElementById("connection-status").innerText =
+      "MQTT 已連線";
+
+    document.getElementById("connection-dot").className =
+      "relative inline-flex rounded-full h-2.5 w-2.5 bg-emerald-500";
+
+    mqttClient.subscribe(
+      [
+        MQTT_TOPIC,
+        MQTT_RESPONSE_TOPIC,
+        ESP32_DHT_TOPIC,
+        ESP32_LIGHT_TOPIC,
+        ESP32_FAN_STATE_TOPIC,
+        ESP32_LED_STATE_TOPIC
+      ],
+      { qos: 0 },
+      function (error) {
+        if (error) {
+          logConsole(
+            "[MQTT Error] Topic 訂閱失敗：" +
+            error.message
+          );
+          return;
+        }
+
+        logConsole(
+          "[MQTT] 已訂閱照護、ESP32 感測與設備狀態 Topic。"
+        );
+      }
+    );
+  });
+
+  mqttClient.on("message", function (topic, payload) {
+    const message = payload.toString().trim();
+
+    logConsole(
+      `[MQTT] 收到 Topic=${topic}，訊息=${message}`
+    );
+
+    if (topic === MQTT_RESPONSE_TOPIC) {
+      try {
+        const response = JSON.parse(message);
+        const label = careCommandLabels[response.action] || response.action || '照護詢問';
+        setCareCommandStatus(response.status === 'completed' ? `凱比完成：${label}` : `凱比執行中：${label}`, response.status === 'completed' ? 'emerald' : 'brand');
+      } catch (error) {
+        logConsole('[MQTT] 凱比回覆格式無法辨識。');
+      }
+      return;
+    }
+
+    if (topic === ESP32_FAN_STATE_TOPIC || topic === ESP32_LED_STATE_TOPIC) {
+      const isOn = message.toUpperCase() === 'ON';
+      if (message.toUpperCase() !== 'ON' && message.toUpperCase() !== 'OFF') {
+        logConsole(`[ESP32 State] 無法辨識裝置狀態：${message}`);
+        return;
+      }
+      if (topic === ESP32_FAN_STATE_TOPIC) currentStatus.fanOn = isOn;
+      if (topic === ESP32_LED_STATE_TOPIC) currentStatus.ledOn = isOn;
+      updateEsp32DeviceControls();
+      logConsole(`[ESP32 State] ${topic === ESP32_FAN_STATE_TOPIC ? '風扇' : '電燈'}目前${isOn ? '開啟' : '關閉'}。`);
+      return;
+    }
+
+    if (topic === ESP32_DHT_TOPIC) {
+      parseMQTT(message, 'ESP32 DHT11 溫濕度感測器');
+      return;
+    }
+
+    if (topic === ESP32_LIGHT_TOPIC) {
+      parseMQTT(message, 'ESP32 亮度感測器');
+      return;
+    }
+
+    parseMQTT(message, 'Kebbi MQTT');
+  });
+
+  mqttClient.on("reconnect", function () {
+    document.getElementById("connection-status").innerText =
+      "MQTT 重新連線中";
+
+    logConsole("[MQTT] 正在重新連線...");
+  });
+
+  mqttClient.on("offline", function () {
+    document.getElementById("connection-status").innerText =
+      "MQTT 離線";
+
+    document.getElementById("connection-dot").className =
+      "relative inline-flex rounded-full h-2.5 w-2.5 bg-amber-500";
+
+    logConsole("[MQTT] Broker 暫時離線。");
+  });
+
+  mqttClient.on("close", function () {
+    logConsole("[MQTT] 連線已關閉。");
+  });
+
+  mqttClient.on("error", function (error) {
+    document.getElementById("connection-status").innerText =
+      "MQTT 連線錯誤";
+
+    document.getElementById("connection-dot").className =
+      "relative inline-flex rounded-full h-2.5 w-2.5 bg-rose-500";
+
+    logConsole(
+      "[MQTT Error] " +
+      error.message
+    );
+  });
+}
+  </script>
+</body>
+</html>
